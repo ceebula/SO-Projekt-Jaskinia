@@ -1,15 +1,18 @@
-﻿# CMakeList.txt: plik projektu CMake najwyższego poziomu, wykonaj konfigurację globalną
-# i uwzględnij podprojekty w tym miejscu.
-#
-cmake_minimum_required (VERSION 3.8)
+﻿cmake_minimum_required(VERSION 3.16)
 
-# Włącz przeładowywanie kodu XAML na gorąco dla kompilatorów MSVC, jeśli jest to obsługiwane.
-if (POLICY CMP0141)
-  cmake_policy(SET CMP0141 NEW)
-  set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<IF:$<AND:$<C_COMPILER_ID:MSVC>,$<CXX_COMPILER_ID:MSVC>>,$<$<CONFIG:Debug,RelWithDebInfo>:EditAndContinue>,$<$<CONFIG:Debug,RelWithDebInfo>:ProgramDatabase>>")
+project(SO_Projekt_Jaskinia VERSION 1.0)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED True)
+
+if(UNIX)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pthread")
 endif()
 
-project ("SO-Projekt-Jaskinia")
+include_directories(include)
 
-# Uwzględnij podprojekty.
-add_subdirectory ("SO-Projekt-Jaskinia")
+add_executable(SymulacjaJaskini src/main.cpp)
+add_executable(Przewodnik src/guide.cpp)
+add_executable(Kasjer src/cashier.cpp)
+add_executable(Zwiedzajacy src/visitor.cpp)
+add_executable(Straznik src/guard.cpp)
