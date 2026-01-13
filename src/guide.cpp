@@ -22,9 +22,15 @@ int main() {
     if (stan == (void*)-1) { perror("[PRZEWODNIK] Błąd shmat"); return 1; }
 
     // Odczyt danych ze współdzielonej struktury
-    cout << "[PRZEWODNIK] Podłączono do Jaskini! ID pamięci: " << shm_id << endl;
-    cout << "[PRZEWODNIK] Obecny kierunek ruchu: " << stan->kierunek_ruchu_kladka << endl;
-    cout << "[PRZEWODNIK] Osoby na kładce: " << stan->osoby_na_kladce << endl;
+    cout << "[PRZEWODNIK] Podłączono do Jaskini! ID: " << shm_id << endl;
+    cout << "------------------------------------------" << endl;
+    cout << "STAN BILETÓW (od Kasjera):" << endl;
+    cout << " -> Trasa 1: " << stan->bilety_sprzedane_t1 << " / " << N1 << endl;
+    cout << " -> Trasa 2: " << stan->bilety_sprzedane_t2 << " / " << N2 << endl;
+    cout << "------------------------------------------" << endl;
+    cout << "STAN KŁADKI:" << endl;
+    cout << " -> Kierunek: " << stan->kierunek_ruchu_kladka << endl;
+    cout << " -> Osoby:    " << stan->osoby_na_kladce << endl;
 
     // Odłączenie pamięci (bez usuwania)
     shmdt(stan);
