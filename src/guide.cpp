@@ -1,40 +1,104 @@
 #include "common.hpp"
 #include <iostream>
+#include <unistd.h> 
 
 using namespace std;
 
 int main() {
     cout << "[PRZEWODNIK] Uruchamiam się..." << endl;
 
-    // Generowanie klucza (taki sam jak w main)
     key_t key = ftok(FTOK_FILE, SHM_ID);
     if (key == -1) { perror("[PRZEWODNIK] Błąd ftok"); return 1; }
 
-    // Pobranie ID istniejącej pamięci (bez IPC_CREAT)
     int shm_id = shmget(key, sizeof(JaskiniaStan), 0666);
-    if (shm_id == -1) { 
-        perror("[PRZEWODNIK] Błąd shmget"); 
-        return 1; 
-    }
+    if (shm_id == -1) { perror("[PRZEWODNIK] Błąd shmget"); return 1; }
 
-    // Dołączenie pamięci do procesu
     JaskiniaStan* stan = (JaskiniaStan*)shmat(shm_id, NULL, 0);
     if (stan == (void*)-1) { perror("[PRZEWODNIK] Błąd shmat"); return 1; }
 
-    // Odczyt danych ze współdzielonej struktury
-    cout << "[PRZEWODNIK] Podłączono do Jaskini! ID: " << shm_id << endl;
-    cout << "------------------------------------------" << endl;
-    cout << "STAN BILETÓW (od Kasjera):" << endl;
-    cout << " -> Trasa 1: " << stan->bilety_sprzedane_t1 << " / " << N1 << endl;
-    cout << " -> Trasa 2: " << stan->bilety_sprzedane_t2 << " / " << N2 << endl;
-    cout << "------------------------------------------" << endl;
-    cout << "STAN KŁADKI:" << endl;
-    cout << " -> Kierunek: " << stan->kierunek_ruchu_kladka << endl;
-    cout << " -> Osoby:    " << stan->osoby_na_kladce << endl;
+    cout << "[PRZEWODNIK] Podłączono. Jaskinia otwarta!" << endl;
 
-    // Odłączenie pamięci (bez usuwania)
+    while (true) {
+        bool podjeto_akcje = false;
+
+        // ========================
+        // 1. OBSŁUGA WEJŚCIA
+        // ========================
+        if (stan->kierunek_ruchu_kladka == DIR_NONE || stan->kierunek_ruchu_kladka == DIR_ENTERING) {
+            
+            // --- WEJŚCIE T1 ---
+            if (stan->bilety_sprzedane_t1 > stan->osoby_trasa1 && stan->osoby_na_kladce < K) {
+                stan->osoby_na_kladce++;
+                stan->kierunek_ruchu_kladka = DIR_ENTERING;
+                cout << ">>> [WEJSCIE T1] Na most. (Most: " << stan->osoby_na_kladce << "/" << K << ")" << endl;
+                usleep(300000); 
+                stan->osoby_na_kladce--;
+                stan->osoby_trasa1++;
+                cout << "    [JASKINIA T1] Dotarł. (Stan: " << stan->osoby_trasa1 << "/" << N1 << ")" << endl;
+                if (stan->osoby_na_kladce == 0) stan->kierunek_ruchu_kladka = DIR_NONE;
+                podjeto_akcje = true;
+            }
+            // --- WEJŚCIE T2 ---
+            else if (stan->bilety_sprzedane_t2 > stan->osoby_trasa2 && stan->osoby_na_kladce < K) {
+                stan->osoby_na_kladce++;
+                stan->kierunek_ruchu_kladka = DIR_ENTERING;
+                cout << ">>> [WEJSCIE T2] Na most. (Most: " << stan->osoby_na_kladce << "/" << K << ")" << endl;
+                usleep(300000);
+                stan->osoby_na_kladce--;
+                stan->osoby_trasa2++;
+                cout << "    [JASKINIA T2] Dotarł. (Stan: " << stan->osoby_trasa2 << "/" << N2 << ")" << endl;
+                if (stan->osoby_na_kladce == 0) stan->kierunek_ruchu_kladka = DIR_NONE;
+                podjeto_akcje = true;
+            }
+        }
+
+        // ========================
+        // 2. OBSŁUGA WYJŚCIA
+        // ========================
+        if (!podjeto_akcje && (stan->kierunek_ruchu_kladka == DIR_NONE || stan->kierunek_ruchu_kladka == DIR_LEAVING)) {
+            
+            // --- WYJŚCIE T1 ---
+            if (stan->osoby_trasa1 > 0 && stan->osoby_na_kladce < K && (rand() % 10 < 3)) { 
+                stan->osoby_trasa1--; 
+                stan->osoby_na_kladce++; 
+                stan->kierunek_ruchu_kladka = DIR_LEAVING;
+                
+                cout << "<<< [WYJSCIE T1] Wchodzi na most. (Most: " << stan->osoby_na_kladce << "/" << K << ")" << endl;
+                
+                usleep(300000);
+                
+                stan->osoby_na_kladce--;
+                stan->bilety_sprzedane_t1--; 
+                
+                cout << "    [KONIEC T1] Turysta opuścił jaskinię. Bilet zwolniony." << endl;
+                
+                if (stan->osoby_na_kladce == 0) stan->kierunek_ruchu_kladka = DIR_NONE;
+                podjeto_akcje = true;
+            }
+
+            // --- WYJŚCIE T2 ---
+            else if (stan->osoby_trasa2 > 0 && stan->osoby_na_kladce < K && (rand() % 10 < 3)) {
+                stan->osoby_trasa2--;
+                stan->osoby_na_kladce++;
+                stan->kierunek_ruchu_kladka = DIR_LEAVING;
+                
+                cout << "<<< [WYJSCIE T2] Wchodzi na most. (Most: " << stan->osoby_na_kladce << "/" << K << ")" << endl;
+                
+                usleep(300000);
+                
+                stan->osoby_na_kladce--;
+                stan->bilety_sprzedane_t2--;
+                
+                cout << "    [KONIEC T2] Turysta opuścił jaskinię. Bilet zwolniony." << endl;
+                
+                if (stan->osoby_na_kladce == 0) stan->kierunek_ruchu_kladka = DIR_NONE;
+                podjeto_akcje = true;
+            }
+        }
+
+        if (!podjeto_akcje) usleep(100000); 
+    }
+
     shmdt(stan);
-
-    cout << "[PRZEWODNIK] Kończę pracę." << endl;
     return 0;
 }
