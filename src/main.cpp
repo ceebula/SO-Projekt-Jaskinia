@@ -5,13 +5,13 @@
 
 using namespace std;
 
-int shm_id = -1;
-int sem_id = -1;
+int shm_id = -1, sem_id = -1, msg_id = -1;
 
 void cleanup(int) {
     kill(0, SIGTERM);
     if (shm_id != -1) shmctl(shm_id, IPC_RMID, NULL);
     if (sem_id != -1) semctl(sem_id, 0, IPC_RMID);
+    if (msg_id != -1) msgctl(msg_id, IPC_RMID, NULL);
     exit(0);
 }
 
@@ -34,6 +34,10 @@ int main() {
     sem_id = semget(key, 1, IPC_CREAT | 0666);
     if (sem_id == -1) { perror("semget"); cleanup(0); }
     semctl(sem_id, 0, SETVAL, 1);
+    
+    key = ftok(FTOK_FILE, MSG_ID);
+    msg_id = msgget(key, IPC_CREAT | 0666);
+    if (msg_id == -1) { perror("msgget"); cleanup(0); }
 
     if (fork() == 0) { execl("./Kasjer", "Kasjer", NULL); exit(1); }
     if (fork() == 0) { execl("./Przewodnik", "Przewodnik", NULL); exit(1); }

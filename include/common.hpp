@@ -5,13 +5,17 @@
 #include <sys/ipc.h>
 #include <sys/shm.h>
 #include <sys/sem.h>
+#include <sys/msg.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <time.h>
 
 #define FTOK_FILE "CMakeLists.txt"
 #define SHM_ID 1
 #define SEM_ID 2
+#define MSG_ID 3
+
 #define N1 10
 #define N2 15
 #define K  3
@@ -27,6 +31,13 @@ struct JaskiniaStan {
     int kierunek_ruchu_kladka;
     int bilety_sprzedane_t1;
     int bilety_sprzedane_t2;
+};
+
+struct Wiadomosc {
+    long mtype;       // 1 = zapytanie, PID = odpowiedz
+    int id_nadawcy;   // PID turysty
+    int typ_biletu;   // 1 lub 2
+    bool odpowiedz;   // true = sprzedano
 };
 
 inline void lock_sem(int sem_id) {

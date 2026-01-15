@@ -4,46 +4,52 @@
 using namespace std;
 
 int main() {
-    cout << "[KASJER] Otwieram kasę..." << endl;
+    cout << "[KASJER] Start..." << endl;
 
-    // Pobranie klucza
     key_t key = ftok(FTOK_FILE, SHM_ID);
-    if (key == -1) { perror("[KASJER] Błąd ftok"); return 1; }
-
-    // Pobranie ID pamięci
     int shm_id = shmget(key, sizeof(JaskiniaStan), 0666);
-    if (shm_id == -1) { 
-        perror("[KASJER] Błąd shmget (czy symulacja jest uruchomiona?)"); 
-        return 1; 
-    }
-
-    // Dołączenie pamięci
     JaskiniaStan* stan = (JaskiniaStan*)shmat(shm_id, NULL, 0);
-    if (stan == (void*)-1) { perror("[KASJER] Błąd shmat"); return 1; }
 
-    cout << "[KASJER] Podłączono. Zaczynam sprzedaż biletów." << endl;
+    key = ftok(FTOK_FILE, SEM_ID);
+    int sem_id = semget(key, 1, 0666);
 
-    // Pętla pracy Kasjera
-    while (true) {
-        // Sprawdzenie miejsca na Trasie 1
-        if (stan->bilety_sprzedane_t1 < N1) {
-            stan->bilety_sprzedane_t1++;
-            cout << "[KASJER] Sprzedano bilet na Trasę 1. (Razem: " 
-                 << stan->bilety_sprzedane_t1 << "/" << N1 << ")" << endl;
-        } else {
-            cout << "[KASJER] Trasa 1 pełna! Czekam na nową grupę..." << endl;
-        }
+    key = ftok(FTOK_FILE, MSG_ID);
+    int msg_id = msgget(key, IPC_CREAT | 0666);
 
-        // Sprawdzenie miejsca na Trasie 2
-        if (stan->bilety_sprzedane_t2 < N2) {
-            stan->bilety_sprzedane_t2++;
-            cout << "[KASJER] Sprzedano bilet na Trasę 2. (Razem: " 
-                 << stan->bilety_sprzedane_t2 << "/" << N2 << ")" << endl;
-        }
-
-        sleep(2);
+    if (shm_id == -1 || sem_id == -1 || msg_id == -1) {
+        perror("[KASJER] Blad inicjalizacji");
+        return 1;
     }
 
-    shmdt(stan);
+    Wiadomosc msg;
+    while (true) {
+        if (msgrcv(msg_id, &msg, sizeof(msg) - sizeof(long), 1, 0) == -1) break;
+
+        bool sprzedano = false;
+
+        lock_sem(sem_id);
+        
+        if (msg.typ_biletu == 1) {
+            if (stan->bilety_sprzedane_t1 < N1) {
+                stan->bilety_sprzedane_t1++;
+                sprzedano = true;
+                cout << "[KASJER] Sprzedano bilet T1 dla " << msg.id_nadawcy 
+                     << ". Stan: " << stan->bilety_sprzedane_t1 << "/" << N1 << endl;
+            }
+        } else {
+            if (stan->bilety_sprzedane_t2 < N2) {
+                stan->bilety_sprzedane_t2++;
+                sprzedano = true;
+                cout << "[KASJER] Sprzedano bilet T2 dla " << msg.id_nadawcy 
+                     << ". Stan: " << stan->bilety_sprzedane_t2 << "/" << N2 << endl;
+            }
+        }
+
+        unlock_sem(sem_id);
+
+        msg.mtype = msg.id_nadawcy;
+        msg.odpowiedz = sprzedano;
+        msgsnd(msg_id, &msg, sizeof(msg) - sizeof(long), 0);
+    }
     return 0;
 }
