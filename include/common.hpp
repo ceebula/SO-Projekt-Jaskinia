@@ -5,41 +5,38 @@
 #include <sys/ipc.h>
 #include <sys/shm.h>
 #include <sys/sem.h>
-#include <sys/msg.h>
 #include <unistd.h>
-#include <signal.h>
-#include <stdio.h>
 #include <stdlib.h>
-#include <errno.h>
+#include <stdio.h>
 
-// Stałe do kluczy IPC
 #define FTOK_FILE "CMakeLists.txt"
 #define SHM_ID 1
 #define SEM_ID 2
+#define N1 10
+#define N2 15
+#define K  3
 
-// Stałe projektowe (Limity)
-#define N1 10      // Pojemność trasy 1
-#define N2 15      // Pojemność trasy 2
-#define K  3       // Pojemność kładki
-
-// Definicje kierunków ruchu na kładce
 #define DIR_NONE 0
-#define DIR_ENTERING 1 // Wchodzenie
-#define DIR_LEAVING 2  // Wychodzenie
+#define DIR_ENTERING 1
+#define DIR_LEAVING 2
 
-// Struktura w pamięci dzielonej
 struct JaskiniaStan {
-    // Liczniki osób w strefach
     int osoby_na_kladce;
     int osoby_trasa1;
     int osoby_trasa2;
-    
-    // Sterowanie ruchem (dla Przewodników)
-    int kierunek_ruchu_kladka; // DIR_NONE, DIR_ENTERING, DIR_LEAVING
-    
-    // Licznik biletów (dla Kasjera)
+    int kierunek_ruchu_kladka;
     int bilety_sprzedane_t1;
     int bilety_sprzedane_t2;
 };
+
+inline void lock_sem(int sem_id) {
+    struct sembuf sb = {0, -1, 0};
+    if (semop(sem_id, &sb, 1) == -1) exit(1);
+}
+
+inline void unlock_sem(int sem_id) {
+    struct sembuf sb = {0, 1, 0};
+    if (semop(sem_id, &sb, 1) == -1) exit(1);
+}
 
 #endif
