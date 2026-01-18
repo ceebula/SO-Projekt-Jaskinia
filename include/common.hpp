@@ -1,53 +1,76 @@
-﻿#ifndef COMMON_HPP
-#define COMMON_HPP
+﻿#pragma once
 
 #include <sys/types.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
 #include <sys/sem.h>
 #include <sys/msg.h>
+
 #include <unistd.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <time.h>
+#include <signal.h>
 
-#define FTOK_FILE "CMakeLists.txt"
-#define SHM_ID 1
-#define SEM_ID 2
-#define MSG_ID 3
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <cerrno>
 
-#define N1 10
-#define N2 15
-#define K  3
+static inline void die_perror(const char* ctx) {
+    perror(ctx);
+    exit(EXIT_FAILURE);
+}
 
-#define DIR_NONE 0
-#define DIR_ENTERING 1
-#define DIR_LEAVING 2
+static constexpr const char* FTOK_FILE = ".";
+static constexpr int SHM_ID = 'S';
+static constexpr int SEM_ID = 'M';
+static constexpr int MSG_ID = 'Q';
+
+static constexpr int N1 = 10;
+static constexpr int N2 = 10;
+static constexpr int K  = 3;
+
+enum KierunekRuchu {
+    DIR_NONE = 0,
+    DIR_ENTERING = 1,
+    DIR_LEAVING = 2
+};
 
 struct JaskiniaStan {
-    int osoby_na_kladce;
-    int osoby_trasa1;
-    int osoby_trasa2;
-    int kierunek_ruchu_kladka;
     int bilety_sprzedane_t1;
     int bilety_sprzedane_t2;
+    int osoby_trasa1;
+    int osoby_trasa2;
+    int osoby_na_kladce;
+    int kierunek_ruchu_kladka;
 };
 
 struct Wiadomosc {
-    long mtype;       // 1 = zapytanie, PID = odpowiedz
-    int id_nadawcy;   // PID turysty
-    int typ_biletu;   // 1 lub 2
-    bool odpowiedz;   // true = sprzedano
+    long mtype;
+    int id_nadawcy;
+    int typ_biletu;
+    int odpowiedz;
 };
 
-inline void lock_sem(int sem_id) {
-    struct sembuf sb = {0, -1, 0};
-    if (semop(sem_id, &sb, 1) == -1) exit(1);
-}
-
-inline void unlock_sem(int sem_id) {
-    struct sembuf sb = {0, 1, 0};
-    if (semop(sem_id, &sb, 1) == -1) exit(1);
-}
-
+union semun {
+    int val;
+    struct semid_ds* buf;
+    unsigned short* array;
+#if defined(__linux__)
+    struct seminfo* __buf;
 #endif
+};
+
+static inline void lock_sem(int semid) {
+    sembuf op{};
+    op.sem_num = 0;
+    op.sem_op = -1;
+    op.sem_flg = 0;
+    if (semop(semid, &op, 1) == -1) die_perror("semop lock");
+}
+
+static inline void unlock_sem(int semid) {
+    sembuf op{};
+    op.sem_num = 0;
+    op.sem_op = 1;
+    op.sem_flg = 0;
+    if (semop(semid, &op, 1) == -1) die_perror("semop unlock");
+}
