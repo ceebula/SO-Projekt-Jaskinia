@@ -14,8 +14,24 @@ void cleanup(int) {
     exit(0);
 }
 
+static void spawn(const char* path, const char* arg0, const char* arg1 = nullptr) {
+    pid_t p = fork();
+    if (p == -1) die_perror("fork");
+    if (p == 0) {
+        if (arg1) {
+            execl(path, arg0, arg1, (char*)NULL);
+        } else {
+            execl(path, arg0, (char*)NULL);
+        }
+        perror("execl");
+        _exit(127);
+    }
+}
+
 int main() {
     signal(SIGINT, cleanup);
+    signal(SIGUSR1, SIG_IGN);
+    signal(SIGUSR2, SIG_IGN);
 
     key_t key = ftok(FTOK_FILE, SHM_ID);
     if (key == -1) die_perror("ftok");
@@ -29,7 +45,7 @@ int main() {
     JaskiniaStan* stan = (JaskiniaStan*)shmat(shm_id, NULL, 0);
     if (stan == (void*)-1) die_perror("shmat");
     memset(stan, 0, sizeof(JaskiniaStan));
-    shmdt(stan);
+    if (shmdt(stan) == -1) perror("shmdt");
 
     key = ftok(FTOK_FILE, SEM_ID);
     sem_id = semget(key, 1, IPC_CREAT | 0600);
@@ -37,19 +53,20 @@ int main() {
 
     semun su{};
     su.val = 1;
-    semctl(sem_id, 0, SETVAL, su);
+    if (semctl(sem_id, 0, SETVAL, su) == -1) die_perror("semctl SETVAL");
 
     key = ftok(FTOK_FILE, MSG_ID);
     msg_id = msgget(key, IPC_CREAT | 0600);
     if (msg_id == -1) die_perror("msgget");
 
-    if (fork() == 0) execl("./Kasjer", "Kasjer", NULL);
-    if (fork() == 0) execl("./Przewodnik", "Przewodnik", NULL);
-    if (fork() == 0) execl("./Straznik", "Straznik", NULL);
+    spawn("./Kasjer", "Kasjer");
+    spawn("./Przewodnik", "Przewodnik", "1");
+    spawn("./Przewodnik", "Przewodnik", "2");
+    spawn("./Straznik", "Straznik");
 
     while (true) {
         sleep(2);
-        if (fork() == 0) execl("./Zwiedzajacy", "Zwiedzajacy", NULL);
-        while (waitpid(-1, NULL, WNOHANG) > 0);
+        spawn("./Zwiedzajacy", "Zwiedzajacy");
+        while (waitpid(-1, NULL, WNOHANG) > 0) {}
     }
 }

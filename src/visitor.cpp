@@ -1,16 +1,19 @@
 #include "common.hpp"
 #include <iostream>
 #include <cstdlib>
+#include <ctime>
 
 using namespace std;
 
 int main() {
-    srand(getpid());
+    signal(SIGUSR1, SIG_IGN);
+    signal(SIGUSR2, SIG_IGN);
+
+    srand((unsigned)time(NULL) ^ (unsigned)getpid());
 
     int pid = getpid();
     int wiek = rand() % 90;
     int powrot = (rand() % 10 == 0);
-
     int trasa = (rand() % 2) + 1;
 
     cout << "[TURYSTA " << pid << "] Wiek=" << wiek;
@@ -28,6 +31,7 @@ int main() {
     }
 
     key_t key = ftok(FTOK_FILE, MSG_ID);
+    if (key == -1) die_perror("ftok MSG");
     int msg_id = msgget(key, 0600);
     if (msg_id == -1) die_perror("msgget");
 
@@ -38,8 +42,8 @@ int main() {
     msg.wiek = wiek;
     msg.powrot = powrot;
 
-    msgsnd(msg_id, &msg, sizeof(msg) - sizeof(long), 0);
-    msgrcv(msg_id, &msg, sizeof(msg) - sizeof(long), pid, 0);
+    if (msgsnd(msg_id, &msg, sizeof(msg) - sizeof(long), 0) == -1) die_perror("msgsnd");
+    if (msgrcv(msg_id, &msg, sizeof(msg) - sizeof(long), pid, 0) == -1) die_perror("msgrcv");
 
     if (msg.odpowiedz)
         cout << "[TURYSTA " << pid << "] Bilet OK" << endl;

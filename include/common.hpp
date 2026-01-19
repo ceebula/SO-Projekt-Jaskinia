@@ -51,7 +51,6 @@ struct Wiadomosc {
     int id_nadawcy;
     int typ_biletu;
     int odpowiedz;
-
     int wiek;
     int powrot;
 };
