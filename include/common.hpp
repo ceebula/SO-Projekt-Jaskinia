@@ -41,6 +41,9 @@ struct JaskiniaStan {
     int osoby_trasa2;
     int osoby_na_kladce;
     int kierunek_ruchu_kladka;
+
+    int alarm_t1;
+    int alarm_t2;
 };
 
 struct Wiadomosc {
