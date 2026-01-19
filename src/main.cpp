@@ -8,9 +8,9 @@ int shm_id = -1, sem_id = -1, msg_id = -1;
 
 void cleanup(int) {
     kill(0, SIGTERM);
-    if (shm_id != -1 && shmctl(shm_id, IPC_RMID, NULL) == -1) perror("shmctl");
-    if (sem_id != -1 && semctl(sem_id, 0, IPC_RMID) == -1) perror("semctl");
-    if (msg_id != -1 && msgctl(msg_id, IPC_RMID, NULL) == -1) perror("msgctl");
+    if (shm_id != -1) shmctl(shm_id, IPC_RMID, NULL);
+    if (sem_id != -1) semctl(sem_id, 0, IPC_RMID);
+    if (msg_id != -1) msgctl(msg_id, IPC_RMID, NULL);
     exit(0);
 }
 
@@ -19,6 +19,9 @@ int main() {
 
     key_t key = ftok(FTOK_FILE, SHM_ID);
     if (key == -1) die_perror("ftok");
+
+    shm_id = shmget(key, 0, 0600);
+    if (shm_id != -1) shmctl(shm_id, IPC_RMID, NULL);
 
     shm_id = shmget(key, sizeof(JaskiniaStan), IPC_CREAT | 0600);
     if (shm_id == -1) die_perror("shmget");
