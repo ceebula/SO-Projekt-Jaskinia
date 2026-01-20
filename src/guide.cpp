@@ -89,12 +89,12 @@ int main(int argc, char** argv) {
         if (trasa == 1) stan->oczekujacy_t1 = ocz;
         else stan->oczekujacy_t2 = ocz;
 
-        bool most_wolny = (stan->osoby_na_kladce < K);
         bool kier_none = (stan->kierunek_ruchu_kladka == DIR_NONE);
-
         bool zrobiono = false;
 
-        if (*wjask > 0 && most_wolny && (kier_none || stan->kierunek_ruchu_kladka == DIR_LEAVING)) {
+        if (*wjask > 0 && (stan->osoby_na_kladce + 1 <= K) &&
+            (kier_none || stan->kierunek_ruchu_kladka == DIR_LEAVING)) {
+
             if ((rand() % 100) < 25 || koniec) {
                 int group_size = 1;
 
@@ -122,18 +122,21 @@ int main(int argc, char** argv) {
         if (!zrobiono && !alarm) {
             GroupItem it{};
             bool jest = (dequeue_group_locked(it) == 0);
-            int group_size = it.group_size > 0 ? it.group_size : 1;
+            int group_size = (it.group_size > 0) ? it.group_size : 1;
 
-            if (jest && (stan->osoby_na_kladce + group_size <= K) &&
+            if (jest &&
+                (stan->osoby_na_kladce + group_size <= K) &&
                 (kier_none || stan->kierunek_ruchu_kladka == DIR_ENTERING)) {
 
                 stan->kierunek_ruchu_kladka = DIR_ENTERING;
                 stan->osoby_na_kladce += group_size;
 
+                int kolejka_po = waiting_count_locked();
                 unlock_sem(sem_id);
 
                 cout << "[PRZEWODNIK T" << trasa << "] WEJSCIE na kladke | kolejka="
-                     << waiting_count_locked() << " | kladka=" << stan->osoby_na_kladce << "/" << K << endl;
+                     << kolejka_po << " | kladka=" << stan->osoby_na_kladce << "/" << K
+                     << " | grupa=" << group_size << endl;
 
                 usleep(300000);
 
@@ -146,11 +149,6 @@ int main(int argc, char** argv) {
                      << " | kladka=" << stan->osoby_na_kladce << endl;
 
                 zrobiono = true;
-            } else {
-                if (jest) {
-                    if (trasa == 1) q_push(stan->q_t1, it);
-                    else q_push(stan->q_t2, it);
-                }
             }
         }
 

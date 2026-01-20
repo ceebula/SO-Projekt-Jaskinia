@@ -107,6 +107,7 @@ struct Wiadomosc {
     int odpowiedz;
     int wiek;
     int powrot;
+    int group_size;
 };
 
 union semun {

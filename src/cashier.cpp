@@ -33,8 +33,12 @@ int main() {
         }
 
         bool ok = true;
+
         if (msg.wiek < 3 || msg.wiek > 75) ok = false;
         if (msg.wiek < 8 && msg.typ_biletu == 1) ok = false;
+
+        int gsz = msg.group_size;
+        if (gsz != 1 && gsz != 2) ok = false;
 
         lock_sem(sem_id);
 
@@ -43,17 +47,17 @@ int main() {
 
         if (ok) {
             if (msg.typ_biletu == 1) {
-                if (stan->bilety_sprzedane_t1 < N1) stan->bilety_sprzedane_t1++;
+                if (stan->bilety_sprzedane_t1 + gsz <= N1) stan->bilety_sprzedane_t1 += gsz;
                 else ok = false;
             } else {
-                if (stan->bilety_sprzedane_t2 < N2) stan->bilety_sprzedane_t2++;
+                if (stan->bilety_sprzedane_t2 + gsz <= N2) stan->bilety_sprzedane_t2 += gsz;
                 else ok = false;
             }
         }
 
         if (ok) {
             GroupItem it{};
-            it.group_size = 1;
+            it.group_size = gsz;
 
             int rc = 0;
             if (msg.typ_biletu == 1) {
