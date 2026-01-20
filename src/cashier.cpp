@@ -33,7 +33,6 @@ int main() {
         }
 
         bool ok = true;
-
         if (msg.wiek < 3 || msg.wiek > 75) ok = false;
         if (msg.wiek < 8 && msg.typ_biletu == 1) ok = false;
 
@@ -44,14 +43,29 @@ int main() {
 
         if (ok) {
             if (msg.typ_biletu == 1) {
-                if (stan->bilety_sprzedane_t1 < N1) {
-                    stan->bilety_sprzedane_t1++;
-                } else ok = false;
+                if (stan->bilety_sprzedane_t1 < N1) stan->bilety_sprzedane_t1++;
+                else ok = false;
             } else {
-                if (stan->bilety_sprzedane_t2 < N2) {
-                    stan->bilety_sprzedane_t2++;
-                } else ok = false;
+                if (stan->bilety_sprzedane_t2 < N2) stan->bilety_sprzedane_t2++;
+                else ok = false;
             }
+        }
+
+        if (ok) {
+            GroupItem it{};
+            it.group_size = 1;
+
+            int rc = 0;
+            if (msg.typ_biletu == 1) {
+                if (msg.powrot) rc = q_push(stan->q_t1_prio, it);
+                else rc = q_push(stan->q_t1, it);
+                stan->oczekujacy_t1 = stan->q_t1.count + stan->q_t1_prio.count;
+            } else {
+                if (msg.powrot) rc = q_push(stan->q_t2_prio, it);
+                else rc = q_push(stan->q_t2, it);
+                stan->oczekujacy_t2 = stan->q_t2.count + stan->q_t2_prio.count;
+            }
+            if (rc == -1) ok = false;
         }
 
         unlock_sem(sem_id);

@@ -56,6 +56,10 @@ int main() {
 
     lock_sem(sem_id);
     memset(stan, 0, sizeof(JaskiniaStan));
+    q_init(stan->q_t1);
+    q_init(stan->q_t1_prio);
+    q_init(stan->q_t2);
+    q_init(stan->q_t2_prio);
     stan->start_time = time(NULL);
     stan->end_time = stan->start_time + SIM_SECONDS;
     unlock_sem(sem_id);

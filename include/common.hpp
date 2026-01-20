@@ -32,11 +32,46 @@ static constexpr int K  = 3;
 static constexpr int ALARM_SECONDS = 10;
 static constexpr int SIM_SECONDS = 60;
 
+static constexpr int QCAP = 128;
+
 enum KierunekRuchu {
     DIR_NONE = 0,
     DIR_ENTERING = 1,
     DIR_LEAVING = 2
 };
+
+struct GroupItem {
+    int group_size;
+};
+
+struct GroupQueue {
+    int head;
+    int tail;
+    int count;
+    GroupItem items[QCAP];
+};
+
+static inline void q_init(GroupQueue& q) {
+    q.head = 0;
+    q.tail = 0;
+    q.count = 0;
+}
+
+static inline int q_push(GroupQueue& q, const GroupItem& it) {
+    if (q.count >= QCAP) return -1;
+    q.items[q.tail] = it;
+    q.tail = (q.tail + 1) % QCAP;
+    q.count++;
+    return 0;
+}
+
+static inline int q_pop(GroupQueue& q, GroupItem& out) {
+    if (q.count <= 0) return -1;
+    out = q.items[q.head];
+    q.head = (q.head + 1) % QCAP;
+    q.count--;
+    return 0;
+}
 
 struct JaskiniaStan {
     int bilety_sprzedane_t1;
@@ -44,6 +79,11 @@ struct JaskiniaStan {
 
     int oczekujacy_t1;
     int oczekujacy_t2;
+
+    GroupQueue q_t1;
+    GroupQueue q_t1_prio;
+    GroupQueue q_t2;
+    GroupQueue q_t2_prio;
 
     int osoby_trasa1;
     int osoby_trasa2;

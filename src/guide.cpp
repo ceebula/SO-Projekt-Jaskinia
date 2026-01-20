@@ -36,6 +36,23 @@ static bool alarm_aktywny_locked(time_t now) {
     }
 }
 
+static int dequeue_group_locked(GroupItem& out) {
+    if (trasa == 1) {
+        if (stan->q_t1_prio.count > 0) return q_pop(stan->q_t1_prio, out);
+        if (stan->q_t1.count > 0) return q_pop(stan->q_t1, out);
+        return -1;
+    } else {
+        if (stan->q_t2_prio.count > 0) return q_pop(stan->q_t2_prio, out);
+        if (stan->q_t2.count > 0) return q_pop(stan->q_t2, out);
+        return -1;
+    }
+}
+
+static int waiting_count_locked() {
+    if (trasa == 1) return stan->q_t1.count + stan->q_t1_prio.count;
+    return stan->q_t2.count + stan->q_t2_prio.count;
+}
+
 int main(int argc, char** argv) {
     if (argc < 2) return 1;
     trasa = atoi(argv[1]);
@@ -65,65 +82,82 @@ int main(int argc, char** argv) {
         bool koniec = (stan->end_time != 0 && now >= stan->end_time);
         bool alarm = alarm_aktywny_locked(now);
 
-        int* ocz = (trasa == 1) ? &stan->oczekujacy_t1 : &stan->oczekujacy_t2;
         int* wjask = (trasa == 1) ? &stan->osoby_trasa1 : &stan->osoby_trasa2;
         int* bilety = (trasa == 1) ? &stan->bilety_sprzedane_t1 : &stan->bilety_sprzedane_t2;
+
+        int ocz = waiting_count_locked();
+        if (trasa == 1) stan->oczekujacy_t1 = ocz;
+        else stan->oczekujacy_t2 = ocz;
 
         bool most_wolny = (stan->osoby_na_kladce < K);
         bool kier_none = (stan->kierunek_ruchu_kladka == DIR_NONE);
 
         bool zrobiono = false;
 
-        // WYJSCIE: losowo wypuszczamy z jaskini
         if (*wjask > 0 && most_wolny && (kier_none || stan->kierunek_ruchu_kladka == DIR_LEAVING)) {
             if ((rand() % 100) < 25 || koniec) {
-                stan->kierunek_ruchu_kladka = DIR_LEAVING;
-                stan->osoby_na_kladce++;
-                (*wjask)--;
-                cout << "[PRZEWODNIK T" << trasa << "] WYJSCIE na kladke | w_jaskini="
-                    << *wjask << " | kladka=" << stan->osoby_na_kladce << "/" << K << endl;
+                int group_size = 1;
 
+                stan->kierunek_ruchu_kladka = DIR_LEAVING;
+                stan->osoby_na_kladce += group_size;
+                (*wjask) -= group_size;
+                if (*wjask < 0) *wjask = 0;
                 unlock_sem(sem_id);
 
                 usleep(300000);
 
                 lock_sem(sem_id);
-                stan->osoby_na_kladce--;
-                (*bilety)--;
-                cout << "[PRZEWODNIK T" << trasa << "] OPUSCIL jaskinie | bilety="
-                    << *bilety << " | kladka=" << stan->osoby_na_kladce << endl;
-
+                stan->osoby_na_kladce -= group_size;
+                (*bilety) -= group_size;
+                if (*bilety < 0) *bilety = 0;
                 if (stan->osoby_na_kladce == 0) stan->kierunek_ruchu_kladka = DIR_NONE;
+
+                cout << "[PRZEWODNIK T" << trasa << "] OPUSCIL jaskinie | bilety=" << *bilety
+                     << " | kladka=" << stan->osoby_na_kladce << endl;
+
                 zrobiono = true;
             }
         }
 
-        // WEJSCIE: bierzemy z kolejki do jaskini (blokowane alarmem)
-        if (!zrobiono && !alarm && *ocz > 0 && most_wolny && (kier_none || stan->kierunek_ruchu_kladka == DIR_ENTERING)) {
-            stan->kierunek_ruchu_kladka = DIR_ENTERING;
-            stan->osoby_na_kladce++;
-            (*ocz)--;
-            cout << "[PRZEWODNIK T" << trasa << "] WEJSCIE na kladke | kolejka="
-                << *ocz << " | kladka=" << stan->osoby_na_kladce << "/" << K << endl;
+        if (!zrobiono && !alarm) {
+            GroupItem it{};
+            bool jest = (dequeue_group_locked(it) == 0);
+            int group_size = it.group_size > 0 ? it.group_size : 1;
 
-            unlock_sem(sem_id);
+            if (jest && (stan->osoby_na_kladce + group_size <= K) &&
+                (kier_none || stan->kierunek_ruchu_kladka == DIR_ENTERING)) {
 
-            usleep(300000);
+                stan->kierunek_ruchu_kladka = DIR_ENTERING;
+                stan->osoby_na_kladce += group_size;
 
-            lock_sem(sem_id);
-            stan->osoby_na_kladce--;
-            (*wjask)++;
-            cout << "[PRZEWODNIK T" << trasa << "] DOTARL do jaskini | w_jaskini="
-                << *wjask << " | kladka=" << stan->osoby_na_kladce << endl;
+                unlock_sem(sem_id);
 
-            if (stan->osoby_na_kladce == 0) stan->kierunek_ruchu_kladka = DIR_NONE;
-            zrobiono = true;
+                cout << "[PRZEWODNIK T" << trasa << "] WEJSCIE na kladke | kolejka="
+                     << waiting_count_locked() << " | kladka=" << stan->osoby_na_kladce << "/" << K << endl;
+
+                usleep(300000);
+
+                lock_sem(sem_id);
+                stan->osoby_na_kladce -= group_size;
+                (*wjask) += group_size;
+                if (stan->osoby_na_kladce == 0) stan->kierunek_ruchu_kladka = DIR_NONE;
+
+                cout << "[PRZEWODNIK T" << trasa << "] DOTARL do jaskini | w_jaskini=" << *wjask
+                     << " | kladka=" << stan->osoby_na_kladce << endl;
+
+                zrobiono = true;
+            } else {
+                if (jest) {
+                    if (trasa == 1) q_push(stan->q_t1, it);
+                    else q_push(stan->q_t2, it);
+                }
+            }
         }
 
-        // Jeśli koniec symulacji i nic nie ma do roboty, możemy zejść
         if (!zrobiono && koniec) {
             bool pusto = (stan->osoby_na_kladce == 0 &&
-                          stan->oczekujacy_t1 == 0 && stan->oczekujacy_t2 == 0 &&
+                          (stan->q_t1.count + stan->q_t1_prio.count) == 0 &&
+                          (stan->q_t2.count + stan->q_t2_prio.count) == 0 &&
                           stan->osoby_trasa1 == 0 && stan->osoby_trasa2 == 0);
             unlock_sem(sem_id);
             if (pusto) break;
