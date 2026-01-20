@@ -45,10 +45,33 @@ int main() {
     if (msgsnd(msg_id, &msg, sizeof(msg) - sizeof(long), 0) == -1) die_perror("msgsnd");
     if (msgrcv(msg_id, &msg, sizeof(msg) - sizeof(long), pid, 0) == -1) die_perror("msgrcv");
 
-    if (msg.odpowiedz)
-        cout << "[TURYSTA " << pid << "] Bilet OK" << endl;
-    else
+    if (!msg.odpowiedz) {
         cout << "[TURYSTA " << pid << "] Brak biletu" << endl;
+        return 0;
+    }
 
+    key = ftok(FTOK_FILE, SHM_ID);
+    if (key == -1) die_perror("ftok SHM");
+    int shm_id = shmget(key, sizeof(JaskiniaStan), 0600);
+    if (shm_id == -1) die_perror("shmget");
+
+    void* mem = shmat(shm_id, NULL, 0);
+    if (mem == (void*)-1) die_perror("shmat");
+
+    key = ftok(FTOK_FILE, SEM_ID);
+    if (key == -1) die_perror("ftok SEM");
+    int sem_id = semget(key, 1, 0600);
+    if (sem_id == -1) die_perror("semget");
+
+    JaskiniaStan* stan = (JaskiniaStan*)mem;
+
+    lock_sem(sem_id);
+    if (trasa == 1) stan->oczekujacy_t1++;
+    else stan->oczekujacy_t2++;
+    unlock_sem(sem_id);
+
+    cout << "[TURYSTA " << pid << "] Bilet OK, dolaczam do kolejki T" << trasa << endl;
+
+    if (shmdt(stan) == -1) perror("shmdt");
     return 0;
 }

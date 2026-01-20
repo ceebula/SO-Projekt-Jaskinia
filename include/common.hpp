@@ -13,6 +13,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <cerrno>
+#include <ctime>
 
 static inline void die_perror(const char* ctx) {
     perror(ctx);
@@ -28,6 +29,9 @@ static constexpr int N1 = 10;
 static constexpr int N2 = 10;
 static constexpr int K  = 3;
 
+static constexpr int ALARM_SECONDS = 10;
+static constexpr int SIM_SECONDS = 60;
+
 enum KierunekRuchu {
     DIR_NONE = 0,
     DIR_ENTERING = 1,
@@ -37,13 +41,23 @@ enum KierunekRuchu {
 struct JaskiniaStan {
     int bilety_sprzedane_t1;
     int bilety_sprzedane_t2;
+
+    int oczekujacy_t1;
+    int oczekujacy_t2;
+
     int osoby_trasa1;
     int osoby_trasa2;
+
     int osoby_na_kladce;
     int kierunek_ruchu_kladka;
 
     int alarm_t1;
     int alarm_t2;
+    time_t alarm_do_t1;
+    time_t alarm_do_t2;
+
+    time_t start_time;
+    time_t end_time;
 };
 
 struct Wiadomosc {

@@ -33,18 +33,24 @@ int main() {
         }
 
         bool ok = true;
+
         if (msg.wiek < 3 || msg.wiek > 75) ok = false;
         if (msg.wiek < 8 && msg.typ_biletu == 1) ok = false;
 
         lock_sem(sem_id);
 
+        time_t now = time(NULL);
+        if (stan->end_time != 0 && now >= stan->end_time) ok = false;
+
         if (ok) {
             if (msg.typ_biletu == 1) {
-                if (stan->bilety_sprzedane_t1 < N1) stan->bilety_sprzedane_t1++;
-                else ok = false;
+                if (stan->bilety_sprzedane_t1 < N1) {
+                    stan->bilety_sprzedane_t1++;
+                } else ok = false;
             } else {
-                if (stan->bilety_sprzedane_t2 < N2) stan->bilety_sprzedane_t2++;
-                else ok = false;
+                if (stan->bilety_sprzedane_t2 < N2) {
+                    stan->bilety_sprzedane_t2++;
+                } else ok = false;
             }
         }
 
@@ -52,6 +58,7 @@ int main() {
 
         msg.mtype = msg.id_nadawcy;
         msg.odpowiedz = ok;
+
         if (msgsnd(msg_id, &msg, sizeof(msg) - sizeof(long), 0) == -1) {
             if (errno == EINTR) continue;
             perror("msgsnd");
