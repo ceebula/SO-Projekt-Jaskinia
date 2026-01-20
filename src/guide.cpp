@@ -15,6 +15,7 @@ static void alarm_t1(int) {
     stan->alarm_do_t1 = time(NULL) + ALARM_SECONDS;
     unlock_sem(sem_id);
     cout << "[PRZEWODNIK T1] Alarm! Blokada wejsc przez " << ALARM_SECONDS << "s" << endl;
+    logf_simple("PRZEWODNIK", "Alarm T1");
 }
 
 static void alarm_t2(int) {
@@ -24,6 +25,7 @@ static void alarm_t2(int) {
     stan->alarm_do_t2 = time(NULL) + ALARM_SECONDS;
     unlock_sem(sem_id);
     cout << "[PRZEWODNIK T2] Alarm! Blokada wejsc przez " << ALARM_SECONDS << "s" << endl;
+    logf_simple("PRZEWODNIK", "Alarm T2");
 }
 
 static bool alarm_aktywny_locked(time_t now) {
@@ -53,10 +55,38 @@ static int waiting_count_locked() {
     return stan->q_t2.count + stan->q_t2_prio.count;
 }
 
+static void enqueue_return_other_route_locked() {
+    int other = (trasa == 1) ? 2 : 1;
+    GroupItem it{};
+    it.group_size = 1;
+
+    if (other == 1) {
+        if (stan->bilety_sprzedane_t1 + 1 <= N1) {
+            if (q_push(stan->q_t1_prio, it) == 0) {
+                stan->bilety_sprzedane_t1 += 1;
+                stan->oczekujacy_t1 = stan->q_t1.count + stan->q_t1_prio.count;
+                logf_simple("PRZEWODNIK", "Powrot: priorytet na T1");
+                cout << "[PRZEWODNIK T" << trasa << "] POWROT -> priorytet na T1" << endl;
+            }
+        }
+    } else {
+        if (stan->bilety_sprzedane_t2 + 1 <= N2) {
+            if (q_push(stan->q_t2_prio, it) == 0) {
+                stan->bilety_sprzedane_t2 += 1;
+                stan->oczekujacy_t2 = stan->q_t2.count + stan->q_t2_prio.count;
+                logf_simple("PRZEWODNIK", "Powrot: priorytet na T2");
+                cout << "[PRZEWODNIK T" << trasa << "] POWROT -> priorytet na T2" << endl;
+            }
+        }
+    }
+}
+
 int main(int argc, char** argv) {
     if (argc < 2) return 1;
     trasa = atoi(argv[1]);
     if (trasa != 1 && trasa != 2) return 1;
+
+    srand((unsigned)time(NULL) ^ (unsigned)getpid());
 
     if (trasa == 1) { signal(SIGUSR1, alarm_t1); signal(SIGUSR2, SIG_IGN); }
     else { signal(SIGUSR2, alarm_t2); signal(SIGUSR1, SIG_IGN); }
@@ -115,6 +145,12 @@ int main(int argc, char** argv) {
                 cout << "[PRZEWODNIK T" << trasa << "] OPUSCIL jaskinie | bilety=" << *bilety
                      << " | kladka=" << stan->osoby_na_kladce << endl;
 
+                logf_simple("PRZEWODNIK", "OPUSCIL jaskinie");
+
+                if ((rand() % 10) == 0) {
+                    enqueue_return_other_route_locked();
+                }
+
                 zrobiono = true;
             }
         }
@@ -138,6 +174,8 @@ int main(int argc, char** argv) {
                      << kolejka_po << " | kladka=" << stan->osoby_na_kladce << "/" << K
                      << " | grupa=" << group_size << endl;
 
+                logf_simple("PRZEWODNIK", "WEJSCIE na kladke");
+
                 usleep(300000);
 
                 lock_sem(sem_id);
@@ -147,6 +185,8 @@ int main(int argc, char** argv) {
 
                 cout << "[PRZEWODNIK T" << trasa << "] DOTARL do jaskini | w_jaskini=" << *wjask
                      << " | kladka=" << stan->osoby_na_kladce << endl;
+
+                logf_simple("PRZEWODNIK", "DOTARL do jaskini");
 
                 zrobiono = true;
             }

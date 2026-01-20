@@ -1,20 +1,31 @@
 #include "common.hpp"
 #include <iostream>
 #include <cstdlib>
-#include <ctime>
 
 using namespace std;
 
 int main() {
-    srand(time(NULL) ^ getpid());
+    signal(SIGUSR1, SIG_IGN);
+    signal(SIGUSR2, SIG_IGN);
+
+    srand((unsigned)time(NULL) ^ (unsigned)getpid());
 
     while (true) {
-        sleep(5 + rand() % 5);
+        sleep(5);
+        int which = (rand() % 2) + 1;
+        int sig = (which == 1) ? SIGUSR1 : SIGUSR2;
 
-        int sig = (rand() % 2) ? SIGUSR1 : SIGUSR2;
-        cout << "[STRAZNIK] Wysylam sygnal "
-             << (sig == SIGUSR1 ? "T1" : "T2") << endl;
+        if (which == 1) {
+            cout << "[STRAZNIK] Wysylam sygnal T1" << endl;
+            logf_simple("STRAZNIK", "Wysylam sygnal T1");
+        } else {
+            cout << "[STRAZNIK] Wysylam sygnal T2" << endl;
+            logf_simple("STRAZNIK", "Wysylam sygnal T2");
+        }
 
-        kill(0, sig);
+        if (kill(0, sig) == -1) {
+            perror("kill");
+        }
     }
+    return 0;
 }

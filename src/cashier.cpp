@@ -74,6 +74,14 @@ int main() {
 
         unlock_sem(sem_id);
 
+        if (ok) {
+            char b[256];
+            snprintf(b, sizeof(b), "Bilet OK: T%d grupa=%d", msg.typ_biletu, msg.group_size);
+            logf_simple("KASJER", b);
+        } else {
+            logf_simple("KASJER", "Odmowa biletu");
+        }
+
         msg.mtype = msg.id_nadawcy;
         msg.odpowiedz = ok;
 

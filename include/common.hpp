@@ -15,12 +15,16 @@
 #include <cerrno>
 #include <ctime>
 
+#include <fcntl.h>
+
 static inline void die_perror(const char* ctx) {
     perror(ctx);
     exit(EXIT_FAILURE);
 }
 
-static constexpr const char* FTOK_FILE = ".";
+static constexpr const char* FTOK_FILE = "ftok.key";
+static constexpr const char* LOG_FILE  = "symulacja.log";
+
 static constexpr int SHM_ID = 'S';
 static constexpr int SEM_ID = 'M';
 static constexpr int MSG_ID = 'Q';
@@ -30,9 +34,25 @@ static constexpr int N2 = 10;
 static constexpr int K  = 3;
 
 static constexpr int ALARM_SECONDS = 10;
-static constexpr int SIM_SECONDS = 60;
+
+static constexpr int SIM_SECONDS_DEFAULT = 60;
+static constexpr int SPAWN_MS_DEFAULT = 1000;
 
 static constexpr int QCAP = 128;
+
+static inline void log_append(const char* line) {
+    int fd = open(LOG_FILE, O_WRONLY | O_CREAT | O_APPEND, 0600);
+    if (fd == -1) { perror("open log"); return; }
+    ssize_t n = write(fd, line, (size_t)strlen(line));
+    if (n == -1) perror("write log");
+    if (close(fd) == -1) perror("close log");
+}
+
+static inline void logf_simple(const char* tag, const char* msg) {
+    char buf[512];
+    int len = snprintf(buf, sizeof(buf), "[%s %d] %s\n", tag, (int)getpid(), msg);
+    if (len > 0) log_append(buf);
+}
 
 enum KierunekRuchu {
     DIR_NONE = 0,
