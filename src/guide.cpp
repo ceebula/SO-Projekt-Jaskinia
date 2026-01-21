@@ -12,9 +12,10 @@ static void alarm_t1(int) {
     if (!stan) return;
     lock_sem(sem_id);
     stan->alarm_t1 = 1;
-    stan->alarm_do_t1 = time(NULL) + ALARM_SECONDS;
+    if (stan->end_time != 0) stan->alarm_do_t1 = stan->end_time;
+    else stan->alarm_do_t1 = time(NULL);
     unlock_sem(sem_id);
-    cout << "[PRZEWODNIK T1] Alarm! Blokada wejsc przez " << ALARM_SECONDS << "s" << endl;
+    cout << "[PRZEWODNIK T1] Alarm! Blokada wejsc do czasu Tk" << endl;
     logf_simple("PRZEWODNIK", "Alarm T1");
 }
 
@@ -22,9 +23,10 @@ static void alarm_t2(int) {
     if (!stan) return;
     lock_sem(sem_id);
     stan->alarm_t2 = 1;
-    stan->alarm_do_t2 = time(NULL) + ALARM_SECONDS;
+    if (stan->end_time != 0) stan->alarm_do_t2 = stan->end_time;
+    else stan->alarm_do_t2 = time(NULL);
     unlock_sem(sem_id);
-    cout << "[PRZEWODNIK T2] Alarm! Blokada wejsc przez " << ALARM_SECONDS << "s" << endl;
+    cout << "[PRZEWODNIK T2] Alarm! Blokada wejsc do czasu Tk" << endl;
     logf_simple("PRZEWODNIK", "Alarm T2");
 }
 
@@ -36,6 +38,25 @@ static bool alarm_aktywny_locked(time_t now) {
         if (stan->alarm_t2 && now >= stan->alarm_do_t2) stan->alarm_t2 = 0;
         return stan->alarm_t2 != 0;
     }
+}
+
+static int cancel_waiting_groups_locked() {
+    int sum = 0;
+    GroupItem it{};
+    if (trasa == 1) {
+        while (q_pop(stan->q_t1_prio, it) == 0) sum += (it.group_size > 0 ? it.group_size : 1);
+        while (q_pop(stan->q_t1, it) == 0) sum += (it.group_size > 0 ? it.group_size : 1);
+        stan->oczekujacy_t1 = 0;
+        stan->bilety_sprzedane_t1 -= sum;
+        if (stan->bilety_sprzedane_t1 < 0) stan->bilety_sprzedane_t1 = 0;
+    } else {
+        while (q_pop(stan->q_t2_prio, it) == 0) sum += (it.group_size > 0 ? it.group_size : 1);
+        while (q_pop(stan->q_t2, it) == 0) sum += (it.group_size > 0 ? it.group_size : 1);
+        stan->oczekujacy_t2 = 0;
+        stan->bilety_sprzedane_t2 -= sum;
+        if (stan->bilety_sprzedane_t2 < 0) stan->bilety_sprzedane_t2 = 0;
+    }
+    return sum;
 }
 
 static int dequeue_group_locked(GroupItem& out) {
@@ -120,6 +141,19 @@ int main(int argc, char** argv) {
         else stan->oczekujacy_t2 = ocz;
 
         bool kier_none = (stan->kierunek_ruchu_kladka == DIR_NONE);
+
+        if (alarm && *wjask == 0 && stan->osoby_na_kladce == 0) {
+            int ocz2 = waiting_count_locked();
+            if (ocz2 > 0) {
+                int anul = cancel_waiting_groups_locked();
+                unlock_sem(sem_id);
+                cout << "[PRZEWODNIK T" << trasa << "] Alarm przed wyjsciem - anulowano " << anul << " osob" << endl;
+                logf_simple("PRZEWODNIK", "Alarm: anulowanie kolejki");
+                usleep(100000);
+                continue;
+            }
+        }
+
         bool zrobiono = false;
 
         if (*wjask > 0 && (stan->osoby_na_kladce + 1 <= K) &&

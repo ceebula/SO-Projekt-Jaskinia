@@ -56,6 +56,11 @@ int main() {
         if (stan->end_time != 0 && now >= stan->end_time) ok = false;
 
         if (ok) {
+            if (msg.typ_biletu == 1 && stan->alarm_t1) ok = false;
+            if (msg.typ_biletu == 2 && stan->alarm_t2) ok = false;
+        }
+
+        if (ok) {
             if (msg.typ_biletu == 1) {
                 if (stan->bilety_sprzedane_t1 + gsz <= N1) stan->bilety_sprzedane_t1 += gsz;
                 else ok = false;
