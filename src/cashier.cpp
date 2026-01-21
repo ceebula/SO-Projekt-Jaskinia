@@ -34,11 +34,21 @@ int main() {
 
         bool ok = true;
 
-        if (msg.wiek < 3 || msg.wiek > 75) ok = false;
-        if (msg.wiek < 8 && msg.typ_biletu == 1) ok = false;
+        if (msg.wiek < 1 || msg.wiek > 80) ok = false;
+        if (msg.typ_biletu != 1 && msg.typ_biletu != 2) ok = false;
 
         int gsz = msg.group_size;
         if (gsz != 1 && gsz != 2) ok = false;
+
+        if (ok) {
+            if (msg.wiek < 8) {
+                if (msg.typ_biletu != 2) ok = false;
+                if (gsz != 2) ok = false;
+            } else {
+                if (gsz != 1) ok = false;
+                if (msg.wiek > 75 && msg.typ_biletu != 2) ok = false;
+            }
+        }
 
         lock_sem(sem_id);
 
@@ -76,7 +86,7 @@ int main() {
 
         if (ok) {
             char b[256];
-            snprintf(b, sizeof(b), "Bilet OK: T%d grupa=%d", msg.typ_biletu, msg.group_size);
+            snprintf(b, sizeof(b), "Bilet OK: T%d grupa=%d wiek=%d", msg.typ_biletu, msg.group_size, msg.wiek);
             logf_simple("KASJER", b);
         } else {
             logf_simple("KASJER", "Odmowa biletu");

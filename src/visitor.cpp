@@ -34,15 +34,10 @@ int main(int argc, char** argv) {
     srand((unsigned)time(NULL) ^ (unsigned)getpid());
 
     int pid = getpid();
-    int wiek = rand() % 90;
+    int wiek = 1 + (rand() % 80);
     int trasa = (rand() % 2) + 1;
 
     cout << "[TURYSTA " << pid << "] Wiek=" << wiek << endl;
-
-    if (wiek < 3 || wiek > 75) {
-        cout << "[TURYSTA " << pid << "] Brak wstepu" << endl;
-        return 0;
-    }
 
     int group_size = 1;
 
@@ -51,12 +46,12 @@ int main(int argc, char** argv) {
         group_size = 2;
         spawn_guardian(pid, wiek);
         cout << "[TURYSTA " << pid << "] Dziecko - ide z opiekunem (grupa=2) tylko T2" << endl;
+    } else if (wiek > 75) {
+        trasa = 2;
+        cout << "[TURYSTA " << pid << "] Senior 76+ - tylko T2" << endl;
     } else {
-        if (trasa == 1) {
-            cout << "[TURYSTA " << pid << "] Chce bilet na T1" << endl;
-        } else {
-            cout << "[TURYSTA " << pid << "] Chce bilet na T2" << endl;
-        }
+        if (trasa == 1) cout << "[TURYSTA " << pid << "] Chce bilet na T1" << endl;
+        else cout << "[TURYSTA " << pid << "] Chce bilet na T2" << endl;
     }
 
     key_t key = ftok(FTOK_FILE, MSG_ID);
