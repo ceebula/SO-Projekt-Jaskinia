@@ -7,7 +7,11 @@ using namespace std;
 int shm_id = -1, sem_id = -1, msg_id = -1;
 
 static void cleanup(int) {
+    signal(SIGTERM, SIG_IGN);
     kill(0, SIGTERM);
+    usleep(500000);
+
+    while (waitpid(-1, NULL, WNOHANG) > 0) {}
 
     if (shm_id != -1) shmctl(shm_id, IPC_RMID, NULL);
     if (sem_id != -1) semctl(sem_id, 0, IPC_RMID);
@@ -119,6 +123,15 @@ int main(int argc, char** argv) {
         usleep((useconds_t)spawn_ms * 1000);
         spawn("./Zwiedzajacy", "Zwiedzajacy");
         while (waitpid(-1, NULL, WNOHANG) > 0) {}
+    }
+
+    logf_simple("MAIN", "Koniec spawnowania, czekam na procesy...");
+
+    time_t grace_end = time(NULL) + 10;
+    while (time(NULL) < grace_end) {
+        int rc = waitpid(-1, NULL, WNOHANG);
+        if (rc == -1 && errno == ECHILD) break;
+        usleep(100000);
     }
 
     logf_simple("MAIN", "STOP");

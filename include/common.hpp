@@ -38,7 +38,15 @@ static constexpr int ALARM_SECONDS = 10;
 static constexpr int SIM_SECONDS_DEFAULT = 60;
 static constexpr int SPAWN_MS_DEFAULT = 1000;
 
+static constexpr int T1_MS = 2000;
+static constexpr int T2_MS = 3000;
+
 static constexpr int QCAP = 128;
+
+static constexpr long MSG_KASJER = 1;
+static constexpr long MSG_ENTER_BASE = 1000000;
+static constexpr long MSG_EXIT_T1 = 2000001;
+static constexpr long MSG_EXIT_T2 = 2000002;
 
 static inline void log_append(const char* line) {
     int fd = open(LOG_FILE, O_WRONLY | O_CREAT | O_APPEND, 0600);
@@ -62,6 +70,7 @@ enum KierunekRuchu {
 
 struct GroupItem {
     int group_size;
+    pid_t pids[2];
 };
 
 struct GroupQueue {
@@ -118,6 +127,9 @@ struct JaskiniaStan {
 
     time_t start_time;
     time_t end_time;
+
+    pid_t przewodnik_t1_pid;
+    pid_t przewodnik_t2_pid;
 };
 
 struct Wiadomosc {
@@ -127,6 +139,18 @@ struct Wiadomosc {
     int odpowiedz;
     int wiek;
     int powrot;
+    int group_size;
+    pid_t pids[2];
+};
+
+struct MsgEnter {
+    long mtype;
+    int trasa;
+};
+
+struct MsgExit {
+    long mtype;
+    pid_t pid;
     int group_size;
 };
 

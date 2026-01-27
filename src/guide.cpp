@@ -7,6 +7,12 @@ using namespace std;
 static JaskiniaStan* stan = nullptr;
 static int trasa = 0;
 static int sem_id = -1;
+static int msg_id = -1;
+static volatile sig_atomic_t g_terminated = 0;
+
+static void handle_term(int) {
+    g_terminated = 1;
+}
 
 static void alarm_t1(int) {
     if (!stan) return;
@@ -76,6 +82,7 @@ static int waiting_count_locked() {
     return stan->q_t2.count + stan->q_t2_prio.count;
 }
 
+__attribute__((unused))
 static void enqueue_return_other_route_locked() {
     int other = (trasa == 1) ? 2 : 1;
     GroupItem it{};
@@ -109,6 +116,7 @@ int main(int argc, char** argv) {
 
     srand((unsigned)time(NULL) ^ (unsigned)getpid());
 
+    signal(SIGTERM, handle_term);
     if (trasa == 1) { signal(SIGUSR1, alarm_t1); signal(SIGUSR2, SIG_IGN); }
     else { signal(SIGUSR2, alarm_t2); signal(SIGUSR1, SIG_IGN); }
 
@@ -124,9 +132,21 @@ int main(int argc, char** argv) {
     sem_id = semget(key, 1, 0600);
     if (sem_id == -1) die_perror("semget");
 
+    key = ftok(FTOK_FILE, MSG_ID);
+    if (key == -1) die_perror("ftok MSG");
+    msg_id = msgget(key, 0600);
+    if (msg_id == -1) die_perror("msgget");
+
+    lock_sem(sem_id);
+    if (trasa == 1) stan->przewodnik_t1_pid = getpid();
+    else stan->przewodnik_t2_pid = getpid();
+    unlock_sem(sem_id);
+
     cout << (trasa == 1 ? "[PRZEWODNIK T1] Gotowy" : "[PRZEWODNIK T2] Gotowy") << endl;
 
-    while (true) {
+    long exit_mtype = (trasa == 1) ? MSG_EXIT_T1 : MSG_EXIT_T2;
+
+    while (!g_terminated) {
         time_t now = time(NULL);
 
         lock_sem(sem_id);
@@ -156,40 +176,43 @@ int main(int argc, char** argv) {
 
         bool zrobiono = false;
 
-        if (*wjask > 0 && (stan->osoby_na_kladce + 1 <= K) &&
-            (kier_none || stan->kierunek_ruchu_kladka == DIR_LEAVING)) {
+        MsgExit msgExit{};
+        unlock_sem(sem_id);
 
-            if ((rand() % 100) < 25 || koniec) {
-                int group_size = 1;
+        if (msgrcv(msg_id, &msgExit, sizeof(msgExit) - sizeof(long), exit_mtype, IPC_NOWAIT) != -1) {
+            int gsz = (msgExit.group_size > 0) ? msgExit.group_size : 1;
+
+            lock_sem(sem_id);
+            if ((stan->osoby_na_kladce + gsz <= K) &&
+                (stan->kierunek_ruchu_kladka == DIR_NONE || stan->kierunek_ruchu_kladka == DIR_LEAVING)) {
 
                 stan->kierunek_ruchu_kladka = DIR_LEAVING;
-                stan->osoby_na_kladce += group_size;
-                (*wjask) -= group_size;
+                stan->osoby_na_kladce += gsz;
+                (*wjask) -= gsz;
                 if (*wjask < 0) *wjask = 0;
                 unlock_sem(sem_id);
 
                 usleep(300000);
 
                 lock_sem(sem_id);
-                stan->osoby_na_kladce -= group_size;
-                (*bilety) -= group_size;
+                stan->osoby_na_kladce -= gsz;
+                (*bilety) -= gsz;
                 if (*bilety < 0) *bilety = 0;
                 if (stan->osoby_na_kladce == 0) stan->kierunek_ruchu_kladka = DIR_NONE;
 
-                cout << "[PRZEWODNIK T" << trasa << "] OPUSCIL jaskinie | bilety=" << *bilety
-                     << " | kladka=" << stan->osoby_na_kladce << endl;
+                cout << "[PRZEWODNIK T" << trasa << "] OPUSCIL jaskinie pid=" << msgExit.pid
+                     << " | bilety=" << *bilety << " | kladka=" << stan->osoby_na_kladce << endl;
 
                 logf_simple("PRZEWODNIK", "OPUSCIL jaskinie");
-
-                if ((rand() % 10) == 0) {
-                    enqueue_return_other_route_locked();
-                }
-
+                unlock_sem(sem_id);
                 zrobiono = true;
+            } else {
+                unlock_sem(sem_id);
             }
         }
 
         if (!zrobiono && !alarm) {
+            lock_sem(sem_id);
             GroupItem it{};
             bool jest = (dequeue_group_locked(it) == 0);
             int group_size = (it.group_size > 0) ? it.group_size : 1;
@@ -206,9 +229,20 @@ int main(int argc, char** argv) {
 
                 cout << "[PRZEWODNIK T" << trasa << "] WEJSCIE na kladke | kolejka="
                      << kolejka_po << " | kladka=" << stan->osoby_na_kladce << "/" << K
-                     << " | grupa=" << group_size << endl;
+                     << " | grupa=" << group_size << " | pid=" << it.pids[0] << endl;
 
                 logf_simple("PRZEWODNIK", "WEJSCIE na kladke");
+
+                for (int i = 0; i < group_size && i < 2; i++) {
+                    if (it.pids[i] > 0) {
+                        MsgEnter msgEnter{};
+                        msgEnter.mtype = MSG_ENTER_BASE + it.pids[i];
+                        msgEnter.trasa = trasa;
+                        if (msgsnd(msg_id, &msgEnter, sizeof(msgEnter) - sizeof(long), 0) == -1) {
+                            if (errno != EINTR) perror("msgsnd enter");
+                        }
+                    }
+                }
 
                 usleep(300000);
 
@@ -222,19 +256,23 @@ int main(int argc, char** argv) {
 
                 logf_simple("PRZEWODNIK", "DOTARL do jaskini");
 
+                unlock_sem(sem_id);
                 zrobiono = true;
+            } else {
+                unlock_sem(sem_id);
             }
         }
 
+        if (g_terminated) break;
+
         if (!zrobiono && koniec) {
+            lock_sem(sem_id);
             bool pusto = (stan->osoby_na_kladce == 0 &&
                           (stan->q_t1.count + stan->q_t1_prio.count) == 0 &&
                           (stan->q_t2.count + stan->q_t2_prio.count) == 0 &&
                           stan->osoby_trasa1 == 0 && stan->osoby_trasa2 == 0);
             unlock_sem(sem_id);
             if (pusto) break;
-        } else {
-            unlock_sem(sem_id);
         }
 
         usleep(100000);

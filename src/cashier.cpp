@@ -3,9 +3,16 @@
 
 using namespace std;
 
+static volatile sig_atomic_t g_terminated = 0;
+
+static void handle_term(int) {
+    g_terminated = 1;
+}
+
 int main() {
     signal(SIGUSR1, SIG_IGN);
     signal(SIGUSR2, SIG_IGN);
+    signal(SIGTERM, handle_term);
 
     key_t key = ftok(FTOK_FILE, SHM_ID);
     if (key == -1) die_perror("ftok SHM");
@@ -25,8 +32,9 @@ int main() {
     if (msg_id == -1) die_perror("msgget");
 
     Wiadomosc msg;
-    while (true) {
-        if (msgrcv(msg_id, &msg, sizeof(msg) - sizeof(long), 1, 0) == -1) {
+    while (!g_terminated) {
+        if (msgrcv(msg_id, &msg, sizeof(msg) - sizeof(long), MSG_KASJER, 0) == -1) {
+            if (g_terminated) break;
             if (errno == EINTR) continue;
             perror("msgrcv");
             break;
@@ -73,6 +81,8 @@ int main() {
         if (ok) {
             GroupItem it{};
             it.group_size = gsz;
+            it.pids[0] = msg.pids[0];
+            it.pids[1] = msg.pids[1];
 
             int rc = 0;
             if (msg.typ_biletu == 1) {
