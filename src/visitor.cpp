@@ -184,4 +184,51 @@ static void run_visitor(int wiek, int trasa, int group_size, pid_t pids[2], int 
             perror("msgsnd exit");
         }
     }
+
+    if (group_size == 1 && (rand() % 10) == 0) {
+        int nowa_trasa = (trasa == 1) ? 2 : 1;
+        if (wiek > 75 && nowa_trasa == 1) return;
+
+        cout << "[TURYSTA " << mypid << "] Powrot! Chce bilet na T" << nowa_trasa << " (priorytet)" << endl;
+
+        Wiadomosc msg2{};
+        msg2.mtype = MSG_KASJER;
+        msg2.id_nadawcy = mypid;
+        msg2.typ_biletu = nowa_trasa;
+        msg2.wiek = wiek;
+        msg2.powrot = 1;
+        msg2.group_size = 1;
+        msg2.pids[0] = mypid;
+        msg2.pids[1] = 0;
+
+        if (msgsnd(msg_id, &msg2, sizeof(msg2) - sizeof(long), 0) == -1) return;
+        if (msgrcv(msg_id, &msg2, sizeof(msg2) - sizeof(long), mypid, 0) == -1) return;
+
+        if (!msg2.odpowiedz) {
+            cout << "[TURYSTA " << mypid << "] Powrot odmowiony" << endl;
+            return;
+        }
+
+        cout << "[TURYSTA " << mypid << "] Powrot OK, czekam w kolejce T" << nowa_trasa << endl;
+        logf_simple("TURYSTA", "Powrot: bilet OK");
+
+        MsgEnter msgEnter2{};
+        if (msgrcv(msg_id, &msgEnter2, sizeof(msgEnter2) - sizeof(long), MSG_ENTER_BASE + mypid, 0) == -1) return;
+        if (msgEnter2.trasa == -1) return;
+
+        cout << "[TURYSTA " << mypid << "] Wchodzę na trasę T" << nowa_trasa << " (powrot)" << endl;
+        logf_simple("TURYSTA", "Powrot: wejście na trasę");
+
+        int czas2 = (nowa_trasa == 1) ? T1_MS : T2_MS;
+        usleep((useconds_t)czas2 * 1000);
+
+        cout << "[TURYSTA " << mypid << "] Skończyłem trasę T" << nowa_trasa << " (powrot)" << endl;
+        logf_simple("TURYSTA", "Powrot: zakończenie trasy");
+
+        MsgExit msgExit2{};
+        msgExit2.mtype = (nowa_trasa == 1) ? MSG_EXIT_T1 : MSG_EXIT_T2;
+        msgExit2.pid = mypid;
+        msgExit2.group_size = 1;
+        msgsnd(msg_id, &msgExit2, sizeof(msgExit2) - sizeof(long), 0);
+    }
 }

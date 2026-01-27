@@ -73,6 +73,8 @@ int main(int argc, char** argv) {
         }
     }
 
+    unlink(LOG_FILE);
+
     int fd = creat(FTOK_FILE, 0600);
     if (fd == -1) die_perror("creat ftok.key");
     if (close(fd) == -1) perror("close ftok.key");
