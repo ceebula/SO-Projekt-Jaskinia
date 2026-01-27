@@ -9,9 +9,12 @@ int shm_id = -1, sem_id = -1, msg_id = -1;
 static void cleanup(int) {
     signal(SIGTERM, SIG_IGN);
     kill(0, SIGTERM);
-    usleep(500000);
 
-    while (waitpid(-1, NULL, WNOHANG) > 0) {}
+    for (int i = 0; i < 30; i++) {
+        int rc = waitpid(-1, NULL, WNOHANG);
+        if (rc == -1 && errno == ECHILD) break;
+        usleep(100000);
+    }
 
     if (shm_id != -1) shmctl(shm_id, IPC_RMID, NULL);
     if (sem_id != -1) semctl(sem_id, 0, IPC_RMID);

@@ -163,12 +163,27 @@ union semun {
 #endif
 };
 
+static inline int lock_sem_interruptible(int semid) {
+    sembuf op{};
+    op.sem_num = 0;
+    op.sem_op = -1;
+    op.sem_flg = 0;
+    while (semop(semid, &op, 1) == -1) {
+        if (errno == EINTR) return -1;
+        die_perror("semop lock");
+    }
+    return 0;
+}
+
 static inline void lock_sem(int semid) {
     sembuf op{};
     op.sem_num = 0;
     op.sem_op = -1;
     op.sem_flg = 0;
-    if (semop(semid, &op, 1) == -1) die_perror("semop lock");
+    while (semop(semid, &op, 1) == -1) {
+        if (errno == EINTR) continue;
+        die_perror("semop lock");
+    }
 }
 
 static inline void unlock_sem(int semid) {
@@ -176,5 +191,8 @@ static inline void unlock_sem(int semid) {
     op.sem_num = 0;
     op.sem_op = 1;
     op.sem_flg = 0;
-    if (semop(semid, &op, 1) == -1) die_perror("semop unlock");
+    while (semop(semid, &op, 1) == -1) {
+        if (errno == EINTR) continue;
+        die_perror("semop unlock");
+    }
 }

@@ -101,7 +101,8 @@ int main() {
 
         if (ok) {
             char b[256];
-            snprintf(b, sizeof(b), "Bilet OK: T%d grupa=%d wiek=%d", msg.typ_biletu, msg.group_size, msg.wiek);
+            const char* platnosc = (msg.wiek < 3) ? " (bezplatny)" : "";
+            snprintf(b, sizeof(b), "Bilet OK: T%d grupa=%d wiek=%d%s", msg.typ_biletu, msg.group_size, msg.wiek, platnosc);
             logf_simple("KASJER", b);
         } else {
             logf_simple("KASJER", "Odmowa biletu");

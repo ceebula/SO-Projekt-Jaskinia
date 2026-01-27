@@ -46,18 +46,42 @@ static bool alarm_aktywny_locked(time_t now) {
     }
 }
 
+static void notify_cancel(pid_t pid) {
+    if (pid <= 0) return;
+    MsgEnter msgCancel{};
+    msgCancel.mtype = MSG_ENTER_BASE + pid;
+    msgCancel.trasa = -1;
+    msgsnd(msg_id, &msgCancel, sizeof(msgCancel) - sizeof(long), IPC_NOWAIT);
+}
+
 static int cancel_waiting_groups_locked() {
     int sum = 0;
     GroupItem it{};
     if (trasa == 1) {
-        while (q_pop(stan->q_t1_prio, it) == 0) sum += (it.group_size > 0 ? it.group_size : 1);
-        while (q_pop(stan->q_t1, it) == 0) sum += (it.group_size > 0 ? it.group_size : 1);
+        while (q_pop(stan->q_t1_prio, it) == 0) {
+            int gs = (it.group_size > 0) ? it.group_size : 1;
+            sum += gs;
+            for (int i = 0; i < gs && i < 2; i++) notify_cancel(it.pids[i]);
+        }
+        while (q_pop(stan->q_t1, it) == 0) {
+            int gs = (it.group_size > 0) ? it.group_size : 1;
+            sum += gs;
+            for (int i = 0; i < gs && i < 2; i++) notify_cancel(it.pids[i]);
+        }
         stan->oczekujacy_t1 = 0;
         stan->bilety_sprzedane_t1 -= sum;
         if (stan->bilety_sprzedane_t1 < 0) stan->bilety_sprzedane_t1 = 0;
     } else {
-        while (q_pop(stan->q_t2_prio, it) == 0) sum += (it.group_size > 0 ? it.group_size : 1);
-        while (q_pop(stan->q_t2, it) == 0) sum += (it.group_size > 0 ? it.group_size : 1);
+        while (q_pop(stan->q_t2_prio, it) == 0) {
+            int gs = (it.group_size > 0) ? it.group_size : 1;
+            sum += gs;
+            for (int i = 0; i < gs && i < 2; i++) notify_cancel(it.pids[i]);
+        }
+        while (q_pop(stan->q_t2, it) == 0) {
+            int gs = (it.group_size > 0) ? it.group_size : 1;
+            sum += gs;
+            for (int i = 0; i < gs && i < 2; i++) notify_cancel(it.pids[i]);
+        }
         stan->oczekujacy_t2 = 0;
         stan->bilety_sprzedane_t2 -= sum;
         if (stan->bilety_sprzedane_t2 < 0) stan->bilety_sprzedane_t2 = 0;
@@ -276,6 +300,13 @@ int main(int argc, char** argv) {
         }
 
         usleep(100000);
+    }
+
+    lock_sem(sem_id);
+    int anul = cancel_waiting_groups_locked();
+    unlock_sem(sem_id);
+    if (anul > 0) {
+        cout << "[PRZEWODNIK T" << trasa << "] Koniec - anulowano " << anul << " oczekujacych" << endl;
     }
 
     if (shmdt(stan) == -1) perror("shmdt");
