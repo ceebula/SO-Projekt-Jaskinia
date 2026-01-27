@@ -64,18 +64,18 @@ int main() {
         if (stan->end_time != 0 && now >= stan->end_time) ok = false;
 
         if (ok) {
-            if (msg.typ_biletu == 1 && stan->alarm_t1) ok = false;
-            if (msg.typ_biletu == 2 && stan->alarm_t2) ok = false;
+            if (msg.typ_biletu == 1) {
+                if (stan->alarm_t1 && now >= stan->alarm_do_t1) stan->alarm_t1 = 0;
+                if (stan->alarm_t1) ok = false;
+            } else {
+                if (stan->alarm_t2 && now >= stan->alarm_do_t2) stan->alarm_t2 = 0;
+                if (stan->alarm_t2) ok = false;
+            }
         }
 
         if (ok) {
-            if (msg.typ_biletu == 1) {
-                if (stan->bilety_sprzedane_t1 + gsz <= N1) stan->bilety_sprzedane_t1 += gsz;
-                else ok = false;
-            } else {
-                if (stan->bilety_sprzedane_t2 + gsz <= N2) stan->bilety_sprzedane_t2 += gsz;
-                else ok = false;
-            }
+            if (msg.typ_biletu == 1) stan->bilety_sprzedane_t1 += gsz;
+            else stan->bilety_sprzedane_t2 += gsz;
         }
 
         if (ok) {
@@ -94,7 +94,11 @@ int main() {
                 else rc = q_push(stan->q_t2, it);
                 stan->oczekujacy_t2 = stan->q_t2.count + stan->q_t2_prio.count;
             }
-            if (rc == -1) ok = false;
+            if (rc == -1) {
+                if (msg.typ_biletu == 1) stan->bilety_sprzedane_t1 -= gsz;
+                else stan->bilety_sprzedane_t2 -= gsz;
+                ok = false;
+            }
         }
 
         unlock_sem(sem_id);

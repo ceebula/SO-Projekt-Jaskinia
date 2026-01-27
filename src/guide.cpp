@@ -18,10 +18,9 @@ static void alarm_t1(int) {
     if (!stan) return;
     lock_sem(sem_id);
     stan->alarm_t1 = 1;
-    if (stan->end_time != 0) stan->alarm_do_t1 = stan->end_time;
-    else stan->alarm_do_t1 = time(NULL);
+    stan->alarm_do_t1 = time(NULL) + ALARM_SECONDS;
     unlock_sem(sem_id);
-    cout << "[PRZEWODNIK T1] Alarm! Blokada wejsc do czasu Tk" << endl;
+    cout << "[PRZEWODNIK T1] Alarm! Blokada wejsc na " << ALARM_SECONDS << "s" << endl;
     logf_simple("PRZEWODNIK", "Alarm T1");
 }
 
@@ -29,10 +28,9 @@ static void alarm_t2(int) {
     if (!stan) return;
     lock_sem(sem_id);
     stan->alarm_t2 = 1;
-    if (stan->end_time != 0) stan->alarm_do_t2 = stan->end_time;
-    else stan->alarm_do_t2 = time(NULL);
+    stan->alarm_do_t2 = time(NULL) + ALARM_SECONDS;
     unlock_sem(sem_id);
-    cout << "[PRZEWODNIK T2] Alarm! Blokada wejsc do czasu Tk" << endl;
+    cout << "[PRZEWODNIK T2] Alarm! Blokada wejsc na " << ALARM_SECONDS << "s" << endl;
     logf_simple("PRZEWODNIK", "Alarm T2");
 }
 
@@ -240,8 +238,10 @@ int main(int argc, char** argv) {
             GroupItem it{};
             bool jest = (dequeue_group_locked(it) == 0);
             int group_size = (it.group_size > 0) ? it.group_size : 1;
+            int limit_trasy = (trasa == 1) ? N1 : N2;
 
             if (jest &&
+                (*wjask + group_size <= limit_trasy) &&
                 (stan->osoby_na_kladce + group_size <= K) &&
                 (kier_none || stan->kierunek_ruchu_kladka == DIR_ENTERING)) {
 
@@ -282,6 +282,10 @@ int main(int argc, char** argv) {
 
                 unlock_sem(sem_id);
                 zrobiono = true;
+            } else if (jest) {
+                if (trasa == 1) q_push(stan->q_t1, it);
+                else q_push(stan->q_t2, it);
+                unlock_sem(sem_id);
             } else {
                 unlock_sem(sem_id);
             }

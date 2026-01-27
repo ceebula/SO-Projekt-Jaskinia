@@ -10,7 +10,7 @@ static void cleanup(int) {
     signal(SIGTERM, SIG_IGN);
     kill(0, SIGTERM);
 
-    for (int i = 0; i < 30; i++) {
+    for (int i = 0; i < 50; i++) {
         int rc = waitpid(-1, NULL, WNOHANG);
         if (rc == -1 && errno == ECHILD) break;
         usleep(100000);

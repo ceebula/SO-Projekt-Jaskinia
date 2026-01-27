@@ -111,6 +111,12 @@ static void run_visitor(int wiek, int trasa, int group_size, pid_t pids[2], int 
         cout << "[OPIEKUN " << mypid << "] Wchodzę na trasę T2" << endl;
         usleep((useconds_t)T2_MS * 1000);
         cout << "[OPIEKUN " << mypid << "] Skończyłem trasę T2" << endl;
+
+        MsgExit msgExit{};
+        msgExit.mtype = MSG_EXIT_T2;
+        msgExit.pid = mypid;
+        msgExit.group_size = 1;
+        msgsnd(msg_id, &msgExit, sizeof(msgExit) - sizeof(long), 0);
         return;
     }
 
@@ -177,7 +183,7 @@ static void run_visitor(int wiek, int trasa, int group_size, pid_t pids[2], int 
     MsgExit msgExit{};
     msgExit.mtype = (trasa == 1) ? MSG_EXIT_T1 : MSG_EXIT_T2;
     msgExit.pid = mypid;
-    msgExit.group_size = group_size;
+    msgExit.group_size = 1;
 
     if (msgsnd(msg_id, &msgExit, sizeof(msgExit) - sizeof(long), 0) == -1) {
         if (errno != EINTR && errno != EIDRM) {
