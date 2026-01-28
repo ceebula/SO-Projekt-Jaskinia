@@ -65,10 +65,8 @@ int main() {
 
         if (ok) {
             if (msg.typ_biletu == 1) {
-                if (stan->alarm_t1 && now >= stan->alarm_do_t1) stan->alarm_t1 = 0;
                 if (stan->alarm_t1) ok = false;
             } else {
-                if (stan->alarm_t2 && now >= stan->alarm_do_t2) stan->alarm_t2 = 0;
                 if (stan->alarm_t2) ok = false;
             }
         }

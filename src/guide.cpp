@@ -18,28 +18,24 @@ static void alarm_t1(int) {
     if (!stan) return;
     lock_sem(sem_id);
     stan->alarm_t1 = 1;
-    stan->alarm_do_t1 = time(NULL) + ALARM_SECONDS;
     unlock_sem(sem_id);
-    cout << "[PRZEWODNIK T1] Alarm! Blokada wejsc na " << ALARM_SECONDS << "s" << endl;
-    logf_simple("PRZEWODNIK", "Alarm T1");
+    cout << "[PRZEWODNIK T1] Alarm! Blokada nowych wejsc do zamkniecia" << endl;
+    logf_simple("PRZEWODNIK", "Alarm T1 - blokada do zamkniecia");
 }
 
 static void alarm_t2(int) {
     if (!stan) return;
     lock_sem(sem_id);
     stan->alarm_t2 = 1;
-    stan->alarm_do_t2 = time(NULL) + ALARM_SECONDS;
     unlock_sem(sem_id);
-    cout << "[PRZEWODNIK T2] Alarm! Blokada wejsc na " << ALARM_SECONDS << "s" << endl;
-    logf_simple("PRZEWODNIK", "Alarm T2");
+    cout << "[PRZEWODNIK T2] Alarm! Blokada nowych wejsc do zamkniecia" << endl;
+    logf_simple("PRZEWODNIK", "Alarm T2 - blokada do zamkniecia");
 }
 
-static bool alarm_aktywny_locked(time_t now) {
+static bool alarm_aktywny_locked() {
     if (trasa == 1) {
-        if (stan->alarm_t1 && now >= stan->alarm_do_t1) stan->alarm_t1 = 0;
         return stan->alarm_t1 != 0;
     } else {
-        if (stan->alarm_t2 && now >= stan->alarm_do_t2) stan->alarm_t2 = 0;
         return stan->alarm_t2 != 0;
     }
 }
@@ -173,7 +169,7 @@ int main(int argc, char** argv) {
 
         lock_sem(sem_id);
         bool koniec = (stan->end_time != 0 && now >= stan->end_time);
-        bool alarm = alarm_aktywny_locked(now);
+        bool alarm = alarm_aktywny_locked();
 
         int* wjask = (trasa == 1) ? &stan->osoby_trasa1 : &stan->osoby_trasa2;
         int* bilety = (trasa == 1) ? &stan->bilety_sprzedane_t1 : &stan->bilety_sprzedane_t2;

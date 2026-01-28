@@ -41,8 +41,6 @@ static constexpr int T1_MS = 2000;
 static constexpr int T2_MS = 3000;
 static constexpr int BRIDGE_DURATION_MS = 300;
 
-static constexpr int ALARM_SECONDS = 10;
-
 static constexpr int SPAWN_MS_DEFAULT = 1000;
 static constexpr int MAX_VISITORS = 50;
 
@@ -127,8 +125,6 @@ struct JaskiniaStan {
 
     int alarm_t1;
     int alarm_t2;
-    time_t alarm_do_t1;
-    time_t alarm_do_t2;
 
     time_t start_time;
     time_t end_time;
