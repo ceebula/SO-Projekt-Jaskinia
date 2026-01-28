@@ -76,8 +76,8 @@ int main(int argc, char** argv) {
             closing_hour = v;
         } else if (a == "--spawn-ms" && i + 1 < argc) {
             int v = parse_int(argv[++i]);
-            if (v < 100 || v > 5000) {
-                cerr << "Niepoprawny --spawn-ms (100..5000)\n";
+            if (v < 5 || v > 5000) {
+                cerr << "Niepoprawny --spawn-ms (5..5000)\n";
                 return 1;
             }
             spawn_ms = v;
