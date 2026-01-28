@@ -1,4 +1,5 @@
-﻿#pragma once
+﻿// common.hpp - Wspólne definicje, stałe i funkcje pomocnicze dla symulacji jaskini
+#pragma once
 
 #include <sys/types.h>
 #include <sys/ipc.h>
@@ -22,36 +23,44 @@ static inline void die_perror(const char* ctx) {
     exit(EXIT_FAILURE);
 }
 
-static constexpr const char* FTOK_FILE = "ftok.key";
-static constexpr const char* LOG_FILE  = "symulacja.log";
+// === Pliki IPC ===
+static constexpr const char* FTOK_FILE = "ftok.key";  ///< Plik klucza dla ftok()
+static constexpr const char* LOG_FILE  = "symulacja.log";  ///< Plik logu symulacji
 
-static constexpr int SHM_ID = 'S';
-static constexpr int SEM_ID = 'M';
-static constexpr int MSG_ID = 'Q';
+// === Identyfikatory IPC (dla ftok) ===
+static constexpr int SHM_ID = 'S';  ///< ID pamięci dzielonej
+static constexpr int SEM_ID = 'M';  ///< ID semafora
+static constexpr int MSG_ID = 'Q';  ///< ID kolejki komunikatów
 
-static constexpr int OPENING_HOUR = 8;
-static constexpr int CLOSING_HOUR = 18;
-static constexpr int SECONDS_PER_HOUR = 6;
+// === Godziny pracy jaskini ===
+static constexpr int OPENING_HOUR = 8;      ///< Domyślna godzina otwarcia (Tp)
+static constexpr int CLOSING_HOUR = 18;     ///< Domyślna godzina zamknięcia (Tk)
+static constexpr int SECONDS_PER_HOUR = 6;  ///< Sekund rzeczywistych na godzinę symulacji
 
-static constexpr int N1 = 10;
-static constexpr int N2 = 10;
-static constexpr int K  = 3;
+// === Pojemności tras i kładki ===
+static constexpr int N1 = 10;  ///< Max osób na trasie T1
+static constexpr int N2 = 10;  ///< Max osób na trasie T2
+static constexpr int K  = 3;   ///< Max osób na kładce jednocześnie
 
-static constexpr int T1_MS = 2000;
-static constexpr int T2_MS = 3000;
-static constexpr int BRIDGE_DURATION_MS = 300;
+// === Czasy zwiedzania ===
+static constexpr int T1_MS = 2000;           ///< Czas zwiedzania trasy T1 [ms]
+static constexpr int T2_MS = 3000;           ///< Czas zwiedzania trasy T2 [ms]
+static constexpr int BRIDGE_DURATION_MS = 300;  ///< Czas przejścia przez kładkę [ms]
 
-static constexpr int SPAWN_MS_DEFAULT = 1000;
-static constexpr int MAX_VISITORS = 50;
-static constexpr int TICKET_PRICE = 20;  // cena biletu w zł
+// === Parametry symulacji ===
+static constexpr int SPAWN_MS_DEFAULT = 1000;  ///< Domyślny interwał spawnu turystów [ms]
+static constexpr int MAX_VISITORS = 50;        ///< Max aktywnych procesów turystów
+static constexpr int TICKET_PRICE = 20;        ///< Cena biletu w zł
 
-static constexpr int QCAP = 128;
+static constexpr int QCAP = 128;  ///< Pojemność kolejki grup
 
-static constexpr long MSG_KASJER = 1;
-static constexpr long MSG_ENTER_BASE = 1000000;
-static constexpr long MSG_EXIT_T1 = 2000001;
-static constexpr long MSG_EXIT_T2 = 2000002;
+// === Typy komunikatów w kolejce ===
+static constexpr long MSG_KASJER = 1;       ///< Komunikat do kasjera (zakup biletu)
+static constexpr long MSG_ENTER_BASE = 1000000;  ///< Baza mtype dla powiadomień o wejściu
+static constexpr long MSG_EXIT_T1 = 2000001;     ///< Komunikat wyjścia z trasy T1
+static constexpr long MSG_EXIT_T2 = 2000002;     ///< Komunikat wyjścia z trasy T2
 
+// Dopisuje linię do pliku logu (używa open/write/close)
 static inline void log_append(const char* line) {
     int fd = open(LOG_FILE, O_WRONLY | O_CREAT | O_APPEND, 0600);
     if (fd == -1) { perror("open log"); return; }
@@ -66,17 +75,20 @@ static inline void logf_simple(const char* tag, const char* msg) {
     if (len > 0) log_append(buf);
 }
 
+// Kierunek ruchu na kładce (wąska - ruch tylko w jedną stronę)
 enum KierunekRuchu {
-    DIR_NONE = 0,
-    DIR_ENTERING = 1,
-    DIR_LEAVING = 2
+    DIR_NONE = 0,      // kładka wolna
+    DIR_ENTERING = 1,  // ruch do jaskini
+    DIR_LEAVING = 2    // ruch z jaskini
 };
 
+// Element kolejki - grupa zwiedzających
 struct GroupItem {
-    int group_size;
-    pid_t pids[2];
+    int group_size;   // rozmiar grupy (1 lub 2)
+    pid_t pids[2];    // PID-y członków
 };
 
+// Kolejka cykliczna grup oczekujących (w pamięci dzielonej)
 struct GroupQueue {
     int head;
     int tail;
@@ -106,40 +118,47 @@ static inline int q_pop(GroupQueue& q, GroupItem& out) {
     return 0;
 }
 
+// Stan jaskini w pamięci dzielonej (dostęp chroniony semaforem)
 struct JaskiniaStan {
-    int bilety_sprzedane_t1;  // aktywne (w kolejce/jaskini)
+    // Liczniki biletów
+    int bilety_sprzedane_t1;  // aktywne bilety T1
     int bilety_sprzedane_t2;
     int bilety_total_t1;      // łączna sprzedaż
     int bilety_total_t2;
 
+    // Kolejki oczekujących
     int oczekujacy_t1;
     int oczekujacy_t2;
-
-    GroupQueue q_t1;
-    GroupQueue q_t1_prio;
+    GroupQueue q_t1;          // kolejka zwykła T1
+    GroupQueue q_t1_prio;     // kolejka priorytetowa T1 (powroty)
     GroupQueue q_t2;
     GroupQueue q_t2_prio;
 
+    // Stan tras
     int osoby_trasa1;
     int osoby_trasa2;
 
+    // Stan kładki
     int osoby_na_kladce;
     int kierunek_ruchu_kladka;
 
+    // Flagi alarmowe (od strażnika)
     int alarm_t1;
     int alarm_t2;
 
+    // Parametry czasowe
     time_t start_time;
     time_t end_time;
     int sim_opening_hour;
     int sim_closing_hour;
 
+    // Statystyki
     int active_visitors;
+    int przychod;
+    int bilety_darmowe;
+    int bilety_znizka;
 
-    int przychod;           // suma w zł
-    int bilety_darmowe;     // dzieci <3
-    int bilety_znizka;      // powroty 50%
-
+    // PID-y przewodników (do sygnałów)
     pid_t przewodnik_t1_pid;
     pid_t przewodnik_t2_pid;
 };
@@ -175,10 +194,11 @@ union semun {
 #endif
 };
 
+// Blokada semafora z możliwością przerwania sygnałem (zwraca -1 przy EINTR)
 static inline int lock_sem_interruptible(int semid) {
     sembuf op{};
     op.sem_num = 0;
-    op.sem_op = -1;
+    op.sem_op = -1;  // operacja P (wait)
     op.sem_flg = 0;
     while (semop(semid, &op, 1) == -1) {
         if (errno == EINTR) return -1;
@@ -187,10 +207,11 @@ static inline int lock_sem_interruptible(int semid) {
     return 0;
 }
 
+// Blokada semafora (mutex) - operacja P (wait)
 static inline void lock_sem(int semid) {
     sembuf op{};
     op.sem_num = 0;
-    op.sem_op = -1;
+    op.sem_op = -1;  // operacja P
     op.sem_flg = 0;
     while (semop(semid, &op, 1) == -1) {
         if (errno == EINTR) continue;
@@ -198,10 +219,11 @@ static inline void lock_sem(int semid) {
     }
 }
 
+// Odblokowanie semafora (mutex) - operacja V (signal)
 static inline void unlock_sem(int semid) {
     sembuf op{};
     op.sem_num = 0;
-    op.sem_op = 1;
+    op.sem_op = 1;  // operacja V
     op.sem_flg = 0;
     while (semop(semid, &op, 1) == -1) {
         if (errno == EINTR) continue;

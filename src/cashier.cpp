@@ -1,3 +1,4 @@
+// cashier.cpp - Proces kasjera (sprzedaż biletów, walidacja regulaminu)
 #include "common.hpp"
 #include <iostream>
 

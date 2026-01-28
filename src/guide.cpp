@@ -1,3 +1,5 @@
+// guide.cpp - Proces przewodnika (zarządzanie trasą, synchronizacja kładki)
+// Obsługuje sygnały SIGUSR1/SIGUSR2 od strażnika
 #include "common.hpp"
 #include <iostream>
 #include <cstdlib>

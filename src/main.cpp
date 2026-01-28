@@ -1,4 +1,6 @@
-﻿#include "common.hpp"
+﻿// main.cpp - Główny kontroler symulacji jaskini
+// Tworzy zasoby IPC, spawnuje procesy, sprząta przy zakończeniu
+#include "common.hpp"
 #include <iostream>
 #include <sys/wait.h>
 
@@ -12,9 +14,10 @@ static int get_sim_hour(time_t start, time_t now, int opening_hour) {
     return hour;
 }
 
+// Handler SIGINT - sprzątanie zasobów IPC i zakończenie procesów
 static void cleanup(int) {
     signal(SIGTERM, SIG_IGN);
-    kill(0, SIGTERM);
+    kill(0, SIGTERM);  // SIGTERM do całej grupy
 
     for (int i = 0; i < 50; i++) {
         int rc = waitpid(-1, NULL, WNOHANG);
@@ -30,6 +33,7 @@ static void cleanup(int) {
     exit(0);
 }
 
+// Uruchamia proces potomny (fork + exec)
 static void spawn(const char* path, const char* arg0, const char* arg1 = nullptr) {
     pid_t p = fork();
     if (p == -1) die_perror("fork");
@@ -41,6 +45,7 @@ static void spawn(const char* path, const char* arg0, const char* arg1 = nullptr
     }
 }
 
+// Parsuje string na int z walidacją
 static int parse_int(const char* s) {
     char* end = nullptr;
     long v = strtol(s, &end, 10);

@@ -1,3 +1,4 @@
+// guard.cpp - Proces strażnika (wysyła SIGUSR1/SIGUSR2 przed zamknięciem)
 #include "common.hpp"
 #include <iostream>
 #include <cstdlib>

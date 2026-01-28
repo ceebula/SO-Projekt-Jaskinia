@@ -1,3 +1,5 @@
+// visitor.cpp - Proces zwiedzającego (turysty)
+// Losowy wiek, dzieci <8 z opiekunem (fork+pipe), seniorzy 76+ tylko T2
 #include "common.hpp"
 #include <iostream>
 #include <cstdlib>
