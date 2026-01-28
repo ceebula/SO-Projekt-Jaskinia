@@ -45,7 +45,9 @@ static void notify_cancel(pid_t pid) {
     MsgEnter msgCancel{};
     msgCancel.mtype = MSG_ENTER_BASE + pid;
     msgCancel.trasa = -1;
-    msgsnd(msg_id, &msgCancel, sizeof(msgCancel) - sizeof(long), IPC_NOWAIT);
+    if (msgsnd(msg_id, &msgCancel, sizeof(msgCancel) - sizeof(long), IPC_NOWAIT) == -1) {
+        if (errno != EAGAIN) perror("msgsnd cancel");
+    }
 }
 
 static int cancel_waiting_groups_locked() {
@@ -83,13 +85,14 @@ static int cancel_waiting_groups_locked() {
     return sum;
 }
 
-static int dequeue_group_locked(GroupItem& out) {
+static int dequeue_group_locked(GroupItem& out, bool& from_prio) {
+    from_prio = false;
     if (trasa == 1) {
-        if (stan->q_t1_prio.count > 0) return q_pop(stan->q_t1_prio, out);
+        if (stan->q_t1_prio.count > 0) { from_prio = true; return q_pop(stan->q_t1_prio, out); }
         if (stan->q_t1.count > 0) return q_pop(stan->q_t1, out);
         return -1;
     } else {
-        if (stan->q_t2_prio.count > 0) return q_pop(stan->q_t2_prio, out);
+        if (stan->q_t2_prio.count > 0) { from_prio = true; return q_pop(stan->q_t2_prio, out); }
         if (stan->q_t2.count > 0) return q_pop(stan->q_t2, out);
         return -1;
     }
@@ -232,7 +235,8 @@ int main(int argc, char** argv) {
         if (!zrobiono && !alarm) {
             lock_sem(sem_id);
             GroupItem it{};
-            bool jest = (dequeue_group_locked(it) == 0);
+            bool from_prio = false;
+            bool jest = (dequeue_group_locked(it, from_prio) == 0);
             int group_size = (it.group_size > 0) ? it.group_size : 1;
             int limit_trasy = (trasa == 1) ? N1 : N2;
 
@@ -279,8 +283,13 @@ int main(int argc, char** argv) {
                 unlock_sem(sem_id);
                 zrobiono = true;
             } else if (jest) {
-                if (trasa == 1) q_push(stan->q_t1, it);
-                else q_push(stan->q_t2, it);
+                if (trasa == 1) {
+                    if (from_prio) q_push(stan->q_t1_prio, it);
+                    else q_push(stan->q_t1, it);
+                } else {
+                    if (from_prio) q_push(stan->q_t2_prio, it);
+                    else q_push(stan->q_t2, it);
+                }
                 unlock_sem(sem_id);
             } else {
                 unlock_sem(sem_id);

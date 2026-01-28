@@ -22,11 +22,11 @@ static void cleanup(int) {
         usleep(100000);
     }
 
-    if (shm_id != -1) shmctl(shm_id, IPC_RMID, NULL);
-    if (sem_id != -1) semctl(sem_id, 0, IPC_RMID);
-    if (msg_id != -1) msgctl(msg_id, IPC_RMID, NULL);
+    if (shm_id != -1 && shmctl(shm_id, IPC_RMID, NULL) == -1) perror("shmctl");
+    if (sem_id != -1 && semctl(sem_id, 0, IPC_RMID) == -1) perror("semctl");
+    if (msg_id != -1 && msgctl(msg_id, IPC_RMID, NULL) == -1) perror("msgctl");
 
-    unlink(FTOK_FILE);
+    if (unlink(FTOK_FILE) == -1 && errno != ENOENT) perror("unlink");
     exit(0);
 }
 
@@ -137,6 +137,11 @@ int main(int argc, char** argv) {
     stan->sim_opening_hour = opening_hour;
     stan->sim_closing_hour = closing_hour;
     stan->active_visitors = 0;
+    stan->przychod = 0;
+    stan->bilety_darmowe = 0;
+    stan->bilety_znizka = 0;
+    stan->bilety_total_t1 = 0;
+    stan->bilety_total_t2 = 0;
     unlock_sem(sem_id);
 
     cout << "[MAIN] Jaskinia otwarta: " << opening_hour << ":00 - " << closing_hour << ":00" << endl;
@@ -153,6 +158,12 @@ int main(int argc, char** argv) {
     while (time(NULL) < end_time) {
         usleep((useconds_t)spawn_ms * 1000);
 
+        while (waitpid(-1, NULL, WNOHANG) > 0) {
+            lock_sem(sem_id);
+            if (stan->active_visitors > 0) stan->active_visitors--;
+            unlock_sem(sem_id);
+        }
+
         lock_sem(sem_id);
         int current_visitors = stan->active_visitors;
         int current_hour = get_sim_hour(sim_start, time(NULL), opening_hour);
@@ -163,7 +174,6 @@ int main(int argc, char** argv) {
         }
 
         if (current_visitors >= MAX_VISITORS) {
-            cout << "[MAIN] Limit odwiedzajacych (" << MAX_VISITORS << ") - czekam" << endl;
             continue;
         }
 
@@ -171,12 +181,6 @@ int main(int argc, char** argv) {
         lock_sem(sem_id);
         stan->active_visitors++;
         unlock_sem(sem_id);
-
-        while (waitpid(-1, NULL, WNOHANG) > 0) {
-            lock_sem(sem_id);
-            if (stan->active_visitors > 0) stan->active_visitors--;
-            unlock_sem(sem_id);
-        }
     }
 
     int final_hour = get_sim_hour(sim_start, time(NULL), opening_hour);
@@ -190,6 +194,27 @@ int main(int argc, char** argv) {
         if (rc == -1 && errno == ECHILD) break;
         usleep(100000);
     }
+
+    lock_sem(sem_id);
+    int total_t1 = stan->bilety_total_t1;
+    int total_t2 = stan->bilety_total_t2;
+    int przychod = stan->przychod;
+    int darmowe = stan->bilety_darmowe;
+    int znizka = stan->bilety_znizka;
+    unlock_sem(sem_id);
+
+    cout << "\n========== PODSUMOWANIE ==========" << endl;
+    cout << "Bilety T1:        " << total_t1 << endl;
+    cout << "Bilety T2:        " << total_t2 << endl;
+    cout << "Razem biletow:    " << (total_t1 + total_t2) << endl;
+    cout << "  - darmowych:    " << darmowe << " (dzieci <3 lat)" << endl;
+    cout << "  - ze znizka:    " << znizka << " (powrot -50%)" << endl;
+    cout << "PRZYCHOD:         " << przychod << " zl" << endl;
+    cout << "==================================\n" << endl;
+
+    char summary[256];
+    snprintf(summary, sizeof(summary), "Bilety: %d, Przychod: %d zl", total_t1 + total_t2, przychod);
+    logf_simple("MAIN", summary);
 
     logf_simple("MAIN", "STOP");
     cleanup(0);

@@ -71,9 +71,28 @@ int main() {
             }
         }
 
+        int cena = 0;
         if (ok) {
-            if (msg.typ_biletu == 1) stan->bilety_sprzedane_t1 += gsz;
-            else stan->bilety_sprzedane_t2 += gsz;
+            if (msg.typ_biletu == 1) {
+                stan->bilety_sprzedane_t1 += gsz;
+                stan->bilety_total_t1 += gsz;
+            } else {
+                stan->bilety_sprzedane_t2 += gsz;
+                stan->bilety_total_t2 += gsz;
+            }
+
+            for (int i = 0; i < gsz; i++) {
+                int wiek_osoby = (i == 0) ? msg.wiek : 30;
+                if (wiek_osoby < 3) {
+                    stan->bilety_darmowe++;
+                } else if (msg.powrot) {
+                    stan->bilety_znizka++;
+                    cena += TICKET_PRICE / 2;
+                } else {
+                    cena += TICKET_PRICE;
+                }
+            }
+            stan->przychod += cena;
         }
 
         if (ok) {
@@ -93,8 +112,19 @@ int main() {
                 stan->oczekujacy_t2 = stan->q_t2.count + stan->q_t2_prio.count;
             }
             if (rc == -1) {
-                if (msg.typ_biletu == 1) stan->bilety_sprzedane_t1 -= gsz;
-                else stan->bilety_sprzedane_t2 -= gsz;
+                if (msg.typ_biletu == 1) {
+                    stan->bilety_sprzedane_t1 -= gsz;
+                    stan->bilety_total_t1 -= gsz;
+                } else {
+                    stan->bilety_sprzedane_t2 -= gsz;
+                    stan->bilety_total_t2 -= gsz;
+                }
+                stan->przychod -= cena;
+                for (int i = 0; i < gsz; i++) {
+                    int wiek_osoby = (i == 0) ? msg.wiek : 30;
+                    if (wiek_osoby < 3) stan->bilety_darmowe--;
+                    else if (msg.powrot) stan->bilety_znizka--;
+                }
                 ok = false;
             }
         }
@@ -103,8 +133,11 @@ int main() {
 
         if (ok) {
             char b[256];
-            const char* platnosc = (msg.wiek < 3) ? " (bezplatny)" : "";
-            snprintf(b, sizeof(b), "Bilet OK: T%d grupa=%d wiek=%d%s", msg.typ_biletu, msg.group_size, msg.wiek, platnosc);
+            const char* info = "";
+            if (msg.wiek < 3) info = " (bezplatny)";
+            else if (msg.powrot) info = " (powrot -50%)";
+            snprintf(b, sizeof(b), "Bilet OK: T%d grupa=%d wiek=%d%s cena=%dzl", 
+                     msg.typ_biletu, msg.group_size, msg.wiek, info, cena);
             logf_simple("KASJER", b);
         } else {
             logf_simple("KASJER", "Odmowa biletu");

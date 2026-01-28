@@ -43,6 +43,7 @@ static constexpr int BRIDGE_DURATION_MS = 300;
 
 static constexpr int SPAWN_MS_DEFAULT = 1000;
 static constexpr int MAX_VISITORS = 50;
+static constexpr int TICKET_PRICE = 20;  // cena biletu w zł
 
 static constexpr int QCAP = 128;
 
@@ -106,8 +107,10 @@ static inline int q_pop(GroupQueue& q, GroupItem& out) {
 }
 
 struct JaskiniaStan {
-    int bilety_sprzedane_t1;
+    int bilety_sprzedane_t1;  // aktywne (w kolejce/jaskini)
     int bilety_sprzedane_t2;
+    int bilety_total_t1;      // łączna sprzedaż
+    int bilety_total_t2;
 
     int oczekujacy_t1;
     int oczekujacy_t2;
@@ -132,6 +135,10 @@ struct JaskiniaStan {
     int sim_closing_hour;
 
     int active_visitors;
+
+    int przychod;           // suma w zł
+    int bilety_darmowe;     // dzieci <3
+    int bilety_znizka;      // powroty 50%
 
     pid_t przewodnik_t1_pid;
     pid_t przewodnik_t2_pid;
