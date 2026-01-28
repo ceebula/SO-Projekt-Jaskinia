@@ -6,6 +6,12 @@ using namespace std;
 
 int shm_id = -1, sem_id = -1, msg_id = -1;
 
+static int get_sim_hour(time_t start, time_t now, int opening_hour) {
+    int elapsed = (int)(now - start);
+    int hour = opening_hour + (elapsed / SECONDS_PER_HOUR);
+    return hour;
+}
+
 static void cleanup(int) {
     signal(SIGTERM, SIG_IGN);
     kill(0, SIGTERM);
@@ -48,18 +54,26 @@ int main(int argc, char** argv) {
     signal(SIGUSR1, SIG_IGN);
     signal(SIGUSR2, SIG_IGN);
 
-    int sim_seconds = SIM_SECONDS_DEFAULT;
+    int opening_hour = OPENING_HOUR;
+    int closing_hour = CLOSING_HOUR;
     int spawn_ms = SPAWN_MS_DEFAULT;
 
     for (int i = 1; i < argc; i++) {
         string a = argv[i];
-        if (a == "--time" && i + 1 < argc) {
+        if (a == "--open" && i + 1 < argc) {
             int v = parse_int(argv[++i]);
-            if (v < 5 || v > 600) {
-                cerr << "Niepoprawny --time (5..600)\n";
+            if (v < 0 || v > 23) {
+                cerr << "Niepoprawny --open (0..23)\n";
                 return 1;
             }
-            sim_seconds = v;
+            opening_hour = v;
+        } else if (a == "--close" && i + 1 < argc) {
+            int v = parse_int(argv[++i]);
+            if (v < 1 || v > 24) {
+                cerr << "Niepoprawny --close (1..24)\n";
+                return 1;
+            }
+            closing_hour = v;
         } else if (a == "--spawn-ms" && i + 1 < argc) {
             int v = parse_int(argv[++i]);
             if (v < 100 || v > 5000) {
@@ -68,10 +82,17 @@ int main(int argc, char** argv) {
             }
             spawn_ms = v;
         } else {
-            cerr << "Uzycie: ./SymulacjaJaskini [--time SEK] [--spawn-ms MS]\n";
+            cerr << "Uzycie: ./SymulacjaJaskini [--open H] [--close H] [--spawn-ms MS]\n";
             return 1;
         }
     }
+
+    if (closing_hour <= opening_hour) {
+        cerr << "Blad: --close musi byc wieksze niz --open\n";
+        return 1;
+    }
+
+    int sim_seconds = (closing_hour - opening_hour) * SECONDS_PER_HOUR;
 
     unlink(LOG_FILE);
 
@@ -113,22 +134,53 @@ int main(int argc, char** argv) {
     q_init(stan->q_t2_prio);
     stan->start_time = time(NULL);
     stan->end_time = stan->start_time + sim_seconds;
+    stan->sim_opening_hour = opening_hour;
+    stan->sim_closing_hour = closing_hour;
+    stan->active_visitors = 0;
     unlock_sem(sem_id);
 
-    if (shmdt(stan) == -1) perror("shmdt");
+    cout << "[MAIN] Jaskinia otwarta: " << opening_hour << ":00 - " << closing_hour << ":00" << endl;
+    cout << "[MAIN] Czas symulacji: " << sim_seconds << "s (" << SECONDS_PER_HOUR << "s = 1h)" << endl;
 
     spawn("./Kasjer", "Kasjer");
     spawn("./Przewodnik", "Przewodnik", "1");
     spawn("./Przewodnik", "Przewodnik", "2");
     spawn("./Straznik", "Straznik");
 
-    time_t end_time = time(NULL) + sim_seconds;
+    time_t sim_start = time(NULL);
+    time_t end_time = sim_start + sim_seconds;
 
     while (time(NULL) < end_time) {
         usleep((useconds_t)spawn_ms * 1000);
+
+        lock_sem(sem_id);
+        int current_visitors = stan->active_visitors;
+        int current_hour = get_sim_hour(sim_start, time(NULL), opening_hour);
+        unlock_sem(sem_id);
+
+        if (current_hour >= closing_hour) {
+            break;
+        }
+
+        if (current_visitors >= MAX_VISITORS) {
+            cout << "[MAIN] Limit odwiedzajacych (" << MAX_VISITORS << ") - czekam" << endl;
+            continue;
+        }
+
         spawn("./Zwiedzajacy", "Zwiedzajacy");
-        while (waitpid(-1, NULL, WNOHANG) > 0) {}
+        lock_sem(sem_id);
+        stan->active_visitors++;
+        unlock_sem(sem_id);
+
+        while (waitpid(-1, NULL, WNOHANG) > 0) {
+            lock_sem(sem_id);
+            if (stan->active_visitors > 0) stan->active_visitors--;
+            unlock_sem(sem_id);
+        }
     }
+
+    int final_hour = get_sim_hour(sim_start, time(NULL), opening_hour);
+    cout << "[MAIN] Godzina zamkniecia: " << final_hour << ":00" << endl;
 
     logf_simple("MAIN", "Koniec spawnowania, czekam na procesy...");
 

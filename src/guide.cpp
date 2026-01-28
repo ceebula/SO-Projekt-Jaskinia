@@ -214,7 +214,7 @@ int main(int argc, char** argv) {
                 if (*wjask < 0) *wjask = 0;
                 unlock_sem(sem_id);
 
-                usleep(300000);
+                usleep((useconds_t)BRIDGE_DURATION_MS * 1000);
 
                 lock_sem(sem_id);
                 stan->osoby_na_kladce -= gsz;
@@ -268,7 +268,7 @@ int main(int argc, char** argv) {
                     }
                 }
 
-                usleep(300000);
+                usleep((useconds_t)BRIDGE_DURATION_MS * 1000);
 
                 lock_sem(sem_id);
                 stan->osoby_na_kladce -= group_size;

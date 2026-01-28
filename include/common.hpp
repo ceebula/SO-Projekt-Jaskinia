@@ -29,17 +29,22 @@ static constexpr int SHM_ID = 'S';
 static constexpr int SEM_ID = 'M';
 static constexpr int MSG_ID = 'Q';
 
+static constexpr int OPENING_HOUR = 8;
+static constexpr int CLOSING_HOUR = 18;
+static constexpr int SECONDS_PER_HOUR = 6;
+
 static constexpr int N1 = 10;
 static constexpr int N2 = 10;
 static constexpr int K  = 3;
 
-static constexpr int ALARM_SECONDS = 10;
-
-static constexpr int SIM_SECONDS_DEFAULT = 60;
-static constexpr int SPAWN_MS_DEFAULT = 1000;
-
 static constexpr int T1_MS = 2000;
 static constexpr int T2_MS = 3000;
+static constexpr int BRIDGE_DURATION_MS = 300;
+
+static constexpr int ALARM_SECONDS = 10;
+
+static constexpr int SPAWN_MS_DEFAULT = 1000;
+static constexpr int MAX_VISITORS = 50;
 
 static constexpr int QCAP = 128;
 
@@ -127,6 +132,10 @@ struct JaskiniaStan {
 
     time_t start_time;
     time_t end_time;
+    int sim_opening_hour;
+    int sim_closing_hour;
+
+    int active_visitors;
 
     pid_t przewodnik_t1_pid;
     pid_t przewodnik_t2_pid;
