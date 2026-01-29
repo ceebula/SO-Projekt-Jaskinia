@@ -105,6 +105,39 @@ static int waiting_count_locked() {
     return stan->q_t2.count + stan->q_t2_prio.count;
 }
 
+static const char* dir_to_str(int kierunek) {
+    return (kierunek == DIR_ENTERING) ? "IN" : 
+           (kierunek == DIR_LEAVING) ? "OUT" : "NONE";
+}
+
+static void log_kladka(const char* action, int kladka_przed, int kier_przed, 
+                       int kladka_po, int kier_po) {
+    struct timespec now;
+    clock_gettime(CLOCK_REALTIME, &now);
+    
+    // Czas od startu symulacji
+    long elapsed_ms = (now.tv_sec - stan->start_time) * 1000 + now.tv_nsec / 1000000;
+    if (elapsed_ms < 0) elapsed_ms = 0;
+    
+    int fd = open("kladka.log", O_WRONLY | O_CREAT | O_APPEND, 0666);
+    if (fd == -1) return;
+    
+    struct flock fl = {F_WRLCK, SEEK_SET, 0, 0, 0};
+    fcntl(fd, F_SETLKW, &fl);
+    
+    char buf[256];
+    int len = snprintf(buf, sizeof(buf), "%3ld.%03lds [T%d] %-18s kladka=%d->%d kierunek=%s->%s\n", 
+                       elapsed_ms / 1000, elapsed_ms % 1000,
+                       trasa, action, 
+                       kladka_przed, kladka_po,
+                       dir_to_str(kier_przed), dir_to_str(kier_po));
+    if (len > 0) write(fd, buf, (size_t)len);
+    
+    fl.l_type = F_UNLCK;
+    fcntl(fd, F_SETLK, &fl);
+    close(fd);
+}
+
 int main(int argc, char** argv) {
     if (argc < 2) return 1;
     trasa = atoi(argv[1]);
@@ -156,8 +189,6 @@ int main(int argc, char** argv) {
         if (trasa == 1) stan->oczekujacy_t1 = ocz;
         else stan->oczekujacy_t2 = ocz;
 
-        bool kier_none = (stan->kierunek_ruchu_kladka == DIR_NONE);
-
         if (alarm && *wjask == 0 && stan->osoby_na_kladce == 0) {
             int ocz2 = waiting_count_locked();
             if (ocz2 > 0) {
@@ -179,6 +210,9 @@ int main(int argc, char** argv) {
             int gsz = (msgExit.group_size > 0) ? msgExit.group_size : 1;
 
             lock_sem(sem_id);
+            int kladka_przed = stan->osoby_na_kladce;
+            int kier_przed = stan->kierunek_ruchu_kladka;
+            
             if ((stan->osoby_na_kladce + gsz <= K) &&
                 (stan->kierunek_ruchu_kladka == DIR_NONE || stan->kierunek_ruchu_kladka == DIR_LEAVING)) {
 
@@ -186,21 +220,33 @@ int main(int argc, char** argv) {
                 stan->osoby_na_kladce += gsz;
                 (*wjask) -= gsz;
                 if (*wjask < 0) *wjask = 0;
+                int exit_kladka = stan->osoby_na_kladce;
+                int exit_kier = stan->kierunek_ruchu_kladka;
                 unlock_sem(sem_id);
+
+                log_kladka("WCHODZI_NA_KLADKE", kladka_przed, kier_przed, exit_kladka, exit_kier);
 
                 usleep((useconds_t)BRIDGE_DURATION_MS * 1000);
 
                 lock_sem(sem_id);
+                int kladka_przed2 = stan->osoby_na_kladce;
+                int kier_przed2 = stan->kierunek_ruchu_kladka;
                 stan->osoby_na_kladce -= gsz;
                 (*bilety) -= gsz;
                 if (*bilety < 0) *bilety = 0;
                 if (stan->osoby_na_kladce == 0) stan->kierunek_ruchu_kladka = DIR_NONE;
+                int exit_kladka_after = stan->osoby_na_kladce;
+                int exit_kier_after = stan->kierunek_ruchu_kladka;
 
                 cout << COL_GREEN << "[PRZEWODNIK T" << trasa << "]" << COL_RESET << " OPUSCIL jaskinie pid=" << msgExit.pid
-                     << " | bilety=" << *bilety << " | kladka=" << stan->osoby_na_kladce << endl;
+                     << " | bilety=" << *bilety << " | kladka=" << exit_kladka_after << endl;
 
-                logf_simple("PRZEWODNIK", "OPUSCIL jaskinie");
+                char logbuf2[128];
+                snprintf(logbuf2, sizeof(logbuf2), "OPUSCIL jaskinie kladka=%d", exit_kladka_after);
+                logf_simple("PRZEWODNIK", logbuf2);
                 unlock_sem(sem_id);
+
+                log_kladka("ZSZEDL_Z_KLADKI", kladka_przed2, kier_przed2, exit_kladka_after, exit_kier_after);
                 zrobiono = true;
             } else {
                 unlock_sem(sem_id);
@@ -218,19 +264,28 @@ int main(int argc, char** argv) {
             if (jest &&
                 (*wjask + group_size <= limit_trasy) &&
                 (stan->osoby_na_kladce + group_size <= K) &&
-                (kier_none || stan->kierunek_ruchu_kladka == DIR_ENTERING)) {
+                (stan->kierunek_ruchu_kladka == DIR_NONE || stan->kierunek_ruchu_kladka == DIR_ENTERING)) {
 
+                int kladka_przed = stan->osoby_na_kladce;
+                int kier_przed = stan->kierunek_ruchu_kladka;
+                
                 stan->kierunek_ruchu_kladka = DIR_ENTERING;
                 stan->osoby_na_kladce += group_size;
+                int kladka_snap = stan->osoby_na_kladce;
+                int kier_snap = stan->kierunek_ruchu_kladka;
 
                 int kolejka_po = waiting_count_locked();
                 unlock_sem(sem_id);
 
+                log_kladka("WCHODZI_NA_KLADKE", kladka_przed, kier_przed, kladka_snap, kier_snap);
+
                 cout << COL_GREEN << "[PRZEWODNIK T" << trasa << "]" << COL_RESET << " WEJSCIE na kladke | kolejka="
-                     << kolejka_po << " | kladka=" << stan->osoby_na_kladce << "/" << K
+                     << kolejka_po << " | kladka=" << kladka_snap << "/" << K
                      << " | grupa=" << group_size << " | pid=" << it.pids[0] << endl;
 
-                logf_simple("PRZEWODNIK", "WEJSCIE na kladke");
+                char logbuf[128];
+                snprintf(logbuf, sizeof(logbuf), "WEJSCIE na kladke kladka=%d", kladka_snap);
+                logf_simple("PRZEWODNIK", logbuf);
 
                 for (int i = 0; i < group_size && i < 2; i++) {
                     if (it.pids[i] > 0) {
@@ -246,16 +301,21 @@ int main(int argc, char** argv) {
                 usleep((useconds_t)BRIDGE_DURATION_MS * 1000);
 
                 lock_sem(sem_id);
+                int kladka_przed2 = stan->osoby_na_kladce;
+                int kier_przed2 = stan->kierunek_ruchu_kladka;
                 stan->osoby_na_kladce -= group_size;
                 (*wjask) += group_size;
                 if (stan->osoby_na_kladce == 0) stan->kierunek_ruchu_kladka = DIR_NONE;
+                int kladka_after = stan->osoby_na_kladce;
+                int kier_after = stan->kierunek_ruchu_kladka;
+                unlock_sem(sem_id);
+
+                log_kladka("ZSZEDL_Z_KLADKI", kladka_przed2, kier_przed2, kladka_after, kier_after);
 
                 cout << COL_GREEN << "[PRZEWODNIK T" << trasa << "]" << COL_RESET << " DOTARL do jaskini | w_jaskini=" << *wjask
-                     << " | kladka=" << stan->osoby_na_kladce << endl;
+                     << " | kladka=" << kladka_after << endl;
 
                 logf_simple("PRZEWODNIK", "DOTARL do jaskini");
-
-                unlock_sem(sem_id);
                 zrobiono = true;
             } else if (jest) {
                 if (trasa == 1) {

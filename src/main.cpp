@@ -14,8 +14,9 @@ static int get_sim_hour(time_t start, time_t now, int opening_hour) {
     return hour;
 }
 
-// Handler SIGINT - sprzątanie zasobów IPC i zakończenie procesów
-static void cleanup(int) {
+// Handler SIGINT/SIGTERM - sprzątanie zasobów IPC i zakończenie procesów
+static void cleanup(int sig) {
+    signal(SIGINT, SIG_IGN);
     signal(SIGTERM, SIG_IGN);
     kill(0, SIGTERM);  // SIGTERM do całej grupy
 
@@ -61,6 +62,7 @@ static void handle_tstp(int) {
 
 int main(int argc, char** argv) {
     signal(SIGINT, cleanup);
+    signal(SIGTERM, cleanup);  // obsługa timeout
     signal(SIGTSTP, handle_tstp);
     signal(SIGUSR1, SIG_IGN);
     signal(SIGUSR2, SIG_IGN);
