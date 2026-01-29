@@ -119,22 +119,20 @@ static void log_kladka(const char* action, int kladka_przed, int kier_przed,
     long elapsed_ms = (now.tv_sec - stan->start_time) * 1000 + now.tv_nsec / 1000000;
     if (elapsed_ms < 0) elapsed_ms = 0;
     
-    int fd = open("kladka.log", O_WRONLY | O_CREAT | O_APPEND, 0666);
+    // Osobny plik dla każdej kładki
+    char filename[32];
+    snprintf(filename, sizeof(filename), "kladka_t%d.log", trasa);
+    
+    int fd = open(filename, O_WRONLY | O_CREAT | O_APPEND, 0666);
     if (fd == -1) return;
     
-    struct flock fl = {F_WRLCK, SEEK_SET, 0, 0, 0};
-    fcntl(fd, F_SETLKW, &fl);
-    
     char buf[256];
-    int len = snprintf(buf, sizeof(buf), "%3ld.%03lds [T%d] %-18s kladka=%d->%d kierunek=%s->%s\n", 
+    int len = snprintf(buf, sizeof(buf), "%3ld.%03lds %-18s kladka=%d->%d kierunek=%s->%s\n", 
                        elapsed_ms / 1000, elapsed_ms % 1000,
-                       trasa, action, 
+                       action, 
                        kladka_przed, kladka_po,
                        dir_to_str(kier_przed), dir_to_str(kier_po));
     if (len > 0) write(fd, buf, (size_t)len);
-    
-    fl.l_type = F_UNLCK;
-    fcntl(fd, F_SETLK, &fl);
     close(fd);
 }
 
@@ -184,12 +182,14 @@ int main(int argc, char** argv) {
 
         int* wjask = (trasa == 1) ? &stan->osoby_trasa1 : &stan->osoby_trasa2;
         int* bilety = (trasa == 1) ? &stan->bilety_sprzedane_t1 : &stan->bilety_sprzedane_t2;
+        int* kladka = &stan->osoby_na_kladce[trasa-1];
+        int* kierunek = &stan->kierunek_ruchu_kladka[trasa-1];
 
         int ocz = waiting_count_locked();
         if (trasa == 1) stan->oczekujacy_t1 = ocz;
         else stan->oczekujacy_t2 = ocz;
 
-        if (alarm && *wjask == 0 && stan->osoby_na_kladce == 0) {
+        if (alarm && *wjask == 0 && *kladka == 0) {
             int ocz2 = waiting_count_locked();
             if (ocz2 > 0) {
                 int anul = cancel_waiting_groups_locked();
@@ -210,18 +210,18 @@ int main(int argc, char** argv) {
             int gsz = (msgExit.group_size > 0) ? msgExit.group_size : 1;
 
             lock_sem(sem_id);
-            int kladka_przed = stan->osoby_na_kladce;
-            int kier_przed = stan->kierunek_ruchu_kladka;
+            int kladka_przed = *kladka;
+            int kier_przed = *kierunek;
             
-            if ((stan->osoby_na_kladce + gsz <= K) &&
-                (stan->kierunek_ruchu_kladka == DIR_NONE || stan->kierunek_ruchu_kladka == DIR_LEAVING)) {
+            if ((*kladka + gsz <= K) &&
+                (*kierunek == DIR_NONE || *kierunek == DIR_LEAVING)) {
 
-                stan->kierunek_ruchu_kladka = DIR_LEAVING;
-                stan->osoby_na_kladce += gsz;
+                *kierunek = DIR_LEAVING;
+                *kladka += gsz;
                 (*wjask) -= gsz;
                 if (*wjask < 0) *wjask = 0;
-                int exit_kladka = stan->osoby_na_kladce;
-                int exit_kier = stan->kierunek_ruchu_kladka;
+                int exit_kladka = *kladka;
+                int exit_kier = *kierunek;
                 unlock_sem(sem_id);
 
                 log_kladka("WCHODZI_NA_KLADKE", kladka_przed, kier_przed, exit_kladka, exit_kier);
@@ -229,14 +229,14 @@ int main(int argc, char** argv) {
                 usleep((useconds_t)BRIDGE_DURATION_MS * 1000);
 
                 lock_sem(sem_id);
-                int kladka_przed2 = stan->osoby_na_kladce;
-                int kier_przed2 = stan->kierunek_ruchu_kladka;
-                stan->osoby_na_kladce -= gsz;
+                int kladka_przed2 = *kladka;
+                int kier_przed2 = *kierunek;
+                *kladka -= gsz;
                 (*bilety) -= gsz;
                 if (*bilety < 0) *bilety = 0;
-                if (stan->osoby_na_kladce == 0) stan->kierunek_ruchu_kladka = DIR_NONE;
-                int exit_kladka_after = stan->osoby_na_kladce;
-                int exit_kier_after = stan->kierunek_ruchu_kladka;
+                if (*kladka == 0) *kierunek = DIR_NONE;
+                int exit_kladka_after = *kladka;
+                int exit_kier_after = *kierunek;
 
                 cout << COL_GREEN << "[PRZEWODNIK T" << trasa << "]" << COL_RESET << " OPUSCIL jaskinie pid=" << msgExit.pid
                      << " | bilety=" << *bilety << " | kladka=" << exit_kladka_after << endl;
@@ -263,16 +263,16 @@ int main(int argc, char** argv) {
 
             if (jest &&
                 (*wjask + group_size <= limit_trasy) &&
-                (stan->osoby_na_kladce + group_size <= K) &&
-                (stan->kierunek_ruchu_kladka == DIR_NONE || stan->kierunek_ruchu_kladka == DIR_ENTERING)) {
+                (*kladka + group_size <= K) &&
+                (*kierunek == DIR_NONE || *kierunek == DIR_ENTERING)) {
 
-                int kladka_przed = stan->osoby_na_kladce;
-                int kier_przed = stan->kierunek_ruchu_kladka;
+                int kladka_przed = *kladka;
+                int kier_przed = *kierunek;
                 
-                stan->kierunek_ruchu_kladka = DIR_ENTERING;
-                stan->osoby_na_kladce += group_size;
-                int kladka_snap = stan->osoby_na_kladce;
-                int kier_snap = stan->kierunek_ruchu_kladka;
+                *kierunek = DIR_ENTERING;
+                *kladka += group_size;
+                int kladka_snap = *kladka;
+                int kier_snap = *kierunek;
 
                 int kolejka_po = waiting_count_locked();
                 unlock_sem(sem_id);
@@ -301,13 +301,13 @@ int main(int argc, char** argv) {
                 usleep((useconds_t)BRIDGE_DURATION_MS * 1000);
 
                 lock_sem(sem_id);
-                int kladka_przed2 = stan->osoby_na_kladce;
-                int kier_przed2 = stan->kierunek_ruchu_kladka;
-                stan->osoby_na_kladce -= group_size;
+                int kladka_przed2 = *kladka;
+                int kier_przed2 = *kierunek;
+                *kladka -= group_size;
                 (*wjask) += group_size;
-                if (stan->osoby_na_kladce == 0) stan->kierunek_ruchu_kladka = DIR_NONE;
-                int kladka_after = stan->osoby_na_kladce;
-                int kier_after = stan->kierunek_ruchu_kladka;
+                if (*kladka == 0) *kierunek = DIR_NONE;
+                int kladka_after = *kladka;
+                int kier_after = *kierunek;
                 unlock_sem(sem_id);
 
                 log_kladka("ZSZEDL_Z_KLADKI", kladka_przed2, kier_przed2, kladka_after, kier_after);
@@ -335,7 +335,7 @@ int main(int argc, char** argv) {
 
         if (!zrobiono && koniec) {
             lock_sem(sem_id);
-            bool pusto = (stan->osoby_na_kladce == 0 &&
+            bool pusto = (*kladka == 0 &&
                           (stan->q_t1.count + stan->q_t1_prio.count) == 0 &&
                           (stan->q_t2.count + stan->q_t2_prio.count) == 0 &&
                           stan->osoby_trasa1 == 0 && stan->osoby_trasa2 == 0);

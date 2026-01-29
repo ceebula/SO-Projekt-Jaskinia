@@ -147,9 +147,9 @@ struct JaskiniaStan {
     int osoby_trasa1;
     int osoby_trasa2;
 
-    // Stan kładki
-    int osoby_na_kladce;
-    int kierunek_ruchu_kladka;
+    // Stan kładek (osobna dla każdej trasy)
+    int osoby_na_kladce[2];       // [0]=T1, [1]=T2
+    int kierunek_ruchu_kladka[2]; // [0]=T1, [1]=T2
 
     // Flagi alarmowe (od strażnika)
     int alarm_t1;
