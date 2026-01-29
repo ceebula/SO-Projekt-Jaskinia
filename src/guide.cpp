@@ -21,7 +21,7 @@ static void alarm_t1(int) {
     lock_sem(sem_id);
     stan->alarm_t1 = 1;
     unlock_sem(sem_id);
-    cout << "[PRZEWODNIK T1] Alarm! Blokada nowych wejsc do zamkniecia" << endl;
+    cout << COL_GREEN << "[PRZEWODNIK T1]" << COL_RESET << " Alarm! Blokada nowych wejsc do zamkniecia" << endl;
     logf_simple("PRZEWODNIK", "Alarm T1 - blokada do zamkniecia");
 }
 
@@ -30,7 +30,7 @@ static void alarm_t2(int) {
     lock_sem(sem_id);
     stan->alarm_t2 = 1;
     unlock_sem(sem_id);
-    cout << "[PRZEWODNIK T2] Alarm! Blokada nowych wejsc do zamkniecia" << endl;
+    cout << COL_GREEN << "[PRZEWODNIK T2]" << COL_RESET << " Alarm! Blokada nowych wejsc do zamkniecia" << endl;
     logf_simple("PRZEWODNIK", "Alarm T2 - blokada do zamkniecia");
 }
 
@@ -138,7 +138,7 @@ int main(int argc, char** argv) {
     else stan->przewodnik_t2_pid = getpid();
     unlock_sem(sem_id);
 
-    cout << (trasa == 1 ? "[PRZEWODNIK T1] Gotowy" : "[PRZEWODNIK T2] Gotowy") << endl;
+    cout << COL_GREEN << (trasa == 1 ? "[PRZEWODNIK T1]" : "[PRZEWODNIK T2]") << COL_RESET << " Gotowy" << endl;
 
     long exit_mtype = (trasa == 1) ? MSG_EXIT_T1 : MSG_EXIT_T2;
 
@@ -163,7 +163,7 @@ int main(int argc, char** argv) {
             if (ocz2 > 0) {
                 int anul = cancel_waiting_groups_locked();
                 unlock_sem(sem_id);
-                cout << "[PRZEWODNIK T" << trasa << "] Alarm przed wyjsciem - anulowano " << anul << " osob" << endl;
+                cout << COL_GREEN << "[PRZEWODNIK T" << trasa << "] Alarm przed wyjsciem - anulowano " << anul << " osob" << endl;
                 logf_simple("PRZEWODNIK", "Alarm: anulowanie kolejki");
                 usleep(100000);
                 continue;
@@ -196,7 +196,7 @@ int main(int argc, char** argv) {
                 if (*bilety < 0) *bilety = 0;
                 if (stan->osoby_na_kladce == 0) stan->kierunek_ruchu_kladka = DIR_NONE;
 
-                cout << "[PRZEWODNIK T" << trasa << "] OPUSCIL jaskinie pid=" << msgExit.pid
+                cout << COL_GREEN << "[PRZEWODNIK T" << trasa << "]" << COL_RESET << " OPUSCIL jaskinie pid=" << msgExit.pid
                      << " | bilety=" << *bilety << " | kladka=" << stan->osoby_na_kladce << endl;
 
                 logf_simple("PRZEWODNIK", "OPUSCIL jaskinie");
@@ -226,7 +226,7 @@ int main(int argc, char** argv) {
                 int kolejka_po = waiting_count_locked();
                 unlock_sem(sem_id);
 
-                cout << "[PRZEWODNIK T" << trasa << "] WEJSCIE na kladke | kolejka="
+                cout << COL_GREEN << "[PRZEWODNIK T" << trasa << "]" << COL_RESET << " WEJSCIE na kladke | kolejka="
                      << kolejka_po << " | kladka=" << stan->osoby_na_kladce << "/" << K
                      << " | grupa=" << group_size << " | pid=" << it.pids[0] << endl;
 
@@ -250,7 +250,7 @@ int main(int argc, char** argv) {
                 (*wjask) += group_size;
                 if (stan->osoby_na_kladce == 0) stan->kierunek_ruchu_kladka = DIR_NONE;
 
-                cout << "[PRZEWODNIK T" << trasa << "] DOTARL do jaskini | w_jaskini=" << *wjask
+                cout << COL_GREEN << "[PRZEWODNIK T" << trasa << "]" << COL_RESET << " DOTARL do jaskini | w_jaskini=" << *wjask
                      << " | kladka=" << stan->osoby_na_kladce << endl;
 
                 logf_simple("PRZEWODNIK", "DOTARL do jaskini");
@@ -290,7 +290,7 @@ int main(int argc, char** argv) {
     int anul = cancel_waiting_groups_locked();
     unlock_sem(sem_id);
     if (anul > 0) {
-        cout << "[PRZEWODNIK T" << trasa << "] Koniec - anulowano " << anul << " oczekujacych" << endl;
+        cout << COL_GREEN << "[PRZEWODNIK T" << trasa << "]" << COL_RESET << " Koniec - anulowano " << anul << " oczekujacych" << endl;
     }
 
     if (shmdt(stan) == -1) perror("shmdt");

@@ -18,6 +18,15 @@
 
 #include <fcntl.h>
 
+// Kolory ANSI dla wyjścia terminala
+#define COL_RESET   "\033[0m"
+#define COL_RED     "\033[31m"
+#define COL_GREEN   "\033[32m"
+#define COL_YELLOW  "\033[33m"
+#define COL_BLUE    "\033[34m"
+#define COL_MAGENTA "\033[35m"
+#define COL_CYAN    "\033[36m"
+
 static inline void die_perror(const char* ctx) {
     perror(ctx);
     exit(EXIT_FAILURE);

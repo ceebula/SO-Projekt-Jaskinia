@@ -54,8 +54,14 @@ static int parse_int(const char* s) {
     return (int)v;
 }
 
+// Handler SIGTSTP (Ctrl+Z) - pauza symulacji
+static void handle_tstp(int) {
+    kill(0, SIGSTOP);
+}
+
 int main(int argc, char** argv) {
     signal(SIGINT, cleanup);
+    signal(SIGTSTP, handle_tstp);
     signal(SIGUSR1, SIG_IGN);
     signal(SIGUSR2, SIG_IGN);
 
@@ -149,8 +155,8 @@ int main(int argc, char** argv) {
     stan->bilety_total_t2 = 0;
     unlock_sem(sem_id);
 
-    cout << "[MAIN] Jaskinia otwarta: " << opening_hour << ":00 - " << closing_hour << ":00" << endl;
-    cout << "[MAIN] Czas symulacji: " << sim_seconds << "s (" << SECONDS_PER_HOUR << "s = 1h)" << endl;
+    cout << COL_CYAN << "[MAIN]" << COL_RESET << " Jaskinia otwarta: " << opening_hour << ":00 - " << closing_hour << ":00" << endl;
+    cout << COL_CYAN << "[MAIN]" << COL_RESET << " Czas symulacji: " << sim_seconds << "s (" << SECONDS_PER_HOUR << "s = 1h)" << endl;
 
     spawn("./Kasjer", "Kasjer");
     spawn("./Przewodnik", "Przewodnik", "1");
@@ -189,7 +195,7 @@ int main(int argc, char** argv) {
     }
 
     int final_hour = get_sim_hour(sim_start, time(NULL), opening_hour);
-    cout << "[MAIN] Godzina zamkniecia: " << final_hour << ":00" << endl;
+    cout << COL_CYAN << "[MAIN]" << COL_RESET << " Godzina zamkniecia: " << final_hour << ":00" << endl;
 
     logf_simple("MAIN", "Koniec spawnowania, czekam na procesy...");
 

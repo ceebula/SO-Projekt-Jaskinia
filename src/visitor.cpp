@@ -34,12 +34,12 @@ int main(int argc, char** argv) {
         pids[0] = child_pid;
         pids[1] = getpid();
         group_size = 2;
-        cout << "[OPIEKUN " << getpid() << "] Idę z dzieckiem pid=" << child_pid << endl;
+        cout << COL_MAGENTA << "[OPIEKUN " << getpid() << "]" << COL_RESET << " Idę z dzieckiem pid=" << child_pid << endl;
         run_visitor(wiek, trasa, group_size, pids, sync_fd);
         return 0;
     }
 
-    cout << "[TURYSTA " << getpid() << "] Wiek=" << wiek << endl;
+    cout << COL_BLUE << "[TURYSTA " << getpid() << "]" << COL_RESET << " Wiek=" << wiek << endl;
 
     if (wiek < 8) {
         trasa = 2;
@@ -66,12 +66,12 @@ int main(int argc, char** argv) {
         pids[0] = getpid();
         pids[1] = guardian;
 
-        cout << "[TURYSTA " << getpid() << "] Dziecko <8 z opiekunem pid=" << guardian << " - tylko T2" << endl;
+        cout << COL_BLUE << "[TURYSTA " << getpid() << "]" << COL_RESET << " Dziecko <8 z opiekunem pid=" << guardian << " - tylko T2" << endl;
     } else if (wiek > 75) {
         trasa = 2;
-        cout << "[TURYSTA " << getpid() << "] Senior 76+ - tylko T2" << endl;
+        cout << COL_BLUE << "[TURYSTA " << getpid() << "]" << COL_RESET << " Senior 76+ - tylko T2" << endl;
     } else {
-        cout << "[TURYSTA " << getpid() << "] Chce bilet na T" << trasa << endl;
+        cout << COL_BLUE << "[TURYSTA " << getpid() << "]" << COL_RESET << " Chce bilet na T" << trasa << endl;
     }
 
     run_visitor(wiek, trasa, group_size, pids, sync_fd);
@@ -106,13 +106,13 @@ static void run_visitor(int wiek, int trasa, int group_size, pid_t pids[2], int 
         }
 
         if (msgEnter.trasa == -1) {
-            cout << "[OPIEKUN " << mypid << "] Kolejka anulowana - wychodzę" << endl;
+            cout << COL_MAGENTA << "[OPIEKUN " << mypid << "]" << COL_RESET << " Kolejka anulowana - wychodzę" << endl;
             return;
         }
 
-        cout << "[OPIEKUN " << mypid << "] Wchodzę na trasę T2" << endl;
+        cout << COL_MAGENTA << "[OPIEKUN " << mypid << "]" << COL_RESET << " Wchodzę na trasę T2" << endl;
         usleep((useconds_t)T2_MS * 1000);
-        cout << "[OPIEKUN " << mypid << "] Skończyłem trasę T2" << endl;
+        cout << COL_MAGENTA << "[OPIEKUN " << mypid << "]" << COL_RESET << " Skończyłem trasę T2" << endl;
 
         MsgExit msgExit{};
         msgExit.mtype = MSG_EXIT_T2;
@@ -147,11 +147,11 @@ static void run_visitor(int wiek, int trasa, int group_size, pid_t pids[2], int 
     }
 
     if (!msg.odpowiedz) {
-        cout << "[TURYSTA " << mypid << "] Brak biletu - wychodzę" << endl;
+        cout << COL_BLUE << "[TURYSTA " << mypid << "]" << COL_RESET << " Brak biletu - wychodzę" << endl;
         return;
     }
 
-    cout << "[TURYSTA " << mypid << "] Bilet OK, czekam w kolejce T" << trasa << endl;
+    cout << COL_BLUE << "[TURYSTA " << mypid << "]" << COL_RESET << " Bilet OK, czekam w kolejce T" << trasa << endl;
 
     if (sync_fd != -1) {
         char c = 1;
@@ -161,25 +161,25 @@ static void run_visitor(int wiek, int trasa, int group_size, pid_t pids[2], int 
     MsgEnter msgEnter{};
     if (msgrcv(msg_id, &msgEnter, sizeof(msgEnter) - sizeof(long), MSG_ENTER_BASE + mypid, 0) == -1) {
         if (g_terminated || errno == EINTR || errno == EIDRM) {
-            cout << "[TURYSTA " << mypid << "] Przerwano - wychodzę" << endl;
+            cout << COL_BLUE << "[TURYSTA " << mypid << "]" << COL_RESET << " Przerwano - wychodzę" << endl;
             return;
         }
         die_perror("msgrcv enter");
     }
 
     if (msgEnter.trasa == -1) {
-        cout << "[TURYSTA " << mypid << "] Kolejka anulowana - wychodzę" << endl;
+        cout << COL_BLUE << "[TURYSTA " << mypid << "]" << COL_RESET << " Kolejka anulowana - wychodzę" << endl;
         logf_simple("TURYSTA", "Kolejka anulowana");
         return;
     }
 
-    cout << "[TURYSTA " << mypid << "] Wchodzę na trasę T" << trasa << endl;
+    cout << COL_BLUE << "[TURYSTA " << mypid << "]" << COL_RESET << " Wchodzę na trasę T" << trasa << endl;
     logf_simple("TURYSTA", "Wejście na trasę");
 
     int czas_ms = (trasa == 1) ? T1_MS : T2_MS;
     usleep((useconds_t)czas_ms * 1000);
 
-    cout << "[TURYSTA " << mypid << "] Skończyłem trasę T" << trasa << ", wychodzę" << endl;
+    cout << COL_BLUE << "[TURYSTA " << mypid << "]" << COL_RESET << " Skończyłem trasę T" << trasa << ", wychodzę" << endl;
     logf_simple("TURYSTA", "Zakończenie trasy");
 
     MsgExit msgExit{};
@@ -197,7 +197,7 @@ static void run_visitor(int wiek, int trasa, int group_size, pid_t pids[2], int 
         int nowa_trasa = (trasa == 1) ? 2 : 1;
         if (wiek > 75 && nowa_trasa == 1) return;
 
-        cout << "[TURYSTA " << mypid << "] Powrot! Chce bilet na T" << nowa_trasa << " (priorytet)" << endl;
+        cout << COL_BLUE << "[TURYSTA " << mypid << "]" << COL_RESET << " Powrot! Chce bilet na T" << nowa_trasa << " (priorytet)" << endl;
 
         Wiadomosc msg2{};
         msg2.mtype = MSG_KASJER;
@@ -213,24 +213,24 @@ static void run_visitor(int wiek, int trasa, int group_size, pid_t pids[2], int 
         if (msgrcv(msg_id, &msg2, sizeof(msg2) - sizeof(long), mypid, 0) == -1) return;
 
         if (!msg2.odpowiedz) {
-            cout << "[TURYSTA " << mypid << "] Powrot odmowiony" << endl;
+            cout << COL_BLUE << "[TURYSTA " << mypid << "]" << COL_RESET << " Powrot odmowiony" << endl;
             return;
         }
 
-        cout << "[TURYSTA " << mypid << "] Powrot OK, czekam w kolejce T" << nowa_trasa << endl;
+        cout << COL_BLUE << "[TURYSTA " << mypid << "]" << COL_RESET << " Powrot OK, czekam w kolejce T" << nowa_trasa << endl;
         logf_simple("TURYSTA", "Powrot: bilet OK");
 
         MsgEnter msgEnter2{};
         if (msgrcv(msg_id, &msgEnter2, sizeof(msgEnter2) - sizeof(long), MSG_ENTER_BASE + mypid, 0) == -1) return;
         if (msgEnter2.trasa == -1) return;
 
-        cout << "[TURYSTA " << mypid << "] Wchodzę na trasę T" << nowa_trasa << " (powrot)" << endl;
+        cout << COL_BLUE << "[TURYSTA " << mypid << "]" << COL_RESET << " Wchodzę na trasę T" << nowa_trasa << " (powrot)" << endl;
         logf_simple("TURYSTA", "Powrot: wejście na trasę");
 
         int czas2 = (nowa_trasa == 1) ? T1_MS : T2_MS;
         usleep((useconds_t)czas2 * 1000);
 
-        cout << "[TURYSTA " << mypid << "] Skończyłem trasę T" << nowa_trasa << " (powrot)" << endl;
+        cout << COL_BLUE << "[TURYSTA " << mypid << "]" << COL_RESET << " Skończyłem trasę T" << nowa_trasa << " (powrot)" << endl;
         logf_simple("TURYSTA", "Powrot: zakończenie trasy");
 
         MsgExit msgExit2{};

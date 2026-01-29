@@ -32,7 +32,7 @@ int main() {
     int sem_id = semget(key, 1, 0600);
     if (sem_id == -1) die_perror("semget");
 
-    cout << "[STRAZNIK] Gotowy, czekam na godzine zamkniecia" << endl;
+    cout << COL_RED << "[STRAZNIK]" << COL_RESET << " Gotowy, czekam na godzine zamkniecia" << endl;
 
     while (!g_terminated) {
         usleep(500000);
@@ -54,7 +54,7 @@ int main() {
         bool should_send_signal = (current_hour >= closing - hours_before_close);
 
         if (should_send_signal && !signal_t1_sent && target_t1 > 0) {
-            cout << "[STRAZNIK] Godzina " << current_hour << ":00 - Wysylam sygnal T1 (zamkniecie o " << closing << ":00)" << endl;
+            cout << COL_RED << "[STRAZNIK]" << COL_RESET << " Godzina " << current_hour << ":00 - Wysylam sygnal T1 (zamkniecie o " << closing << ":00)" << endl;
             logf_simple("STRAZNIK", "Sygnal T1 przed zamknieciem");
             if (kill(target_t1, SIGUSR1) == -1) {
                 if (errno != ESRCH) perror("kill T1");
@@ -63,7 +63,7 @@ int main() {
         }
 
         if (should_send_signal && !signal_t2_sent && target_t2 > 0) {
-            cout << "[STRAZNIK] Godzina " << current_hour << ":00 - Wysylam sygnal T2 (zamkniecie o " << closing << ":00)" << endl;
+            cout << COL_RED << "[STRAZNIK]" << COL_RESET << " Godzina " << current_hour << ":00 - Wysylam sygnal T2 (zamkniecie o " << closing << ":00)" << endl;
             logf_simple("STRAZNIK", "Sygnal T2 przed zamknieciem");
             if (kill(target_t2, SIGUSR2) == -1) {
                 if (errno != ESRCH) perror("kill T2");
@@ -72,7 +72,7 @@ int main() {
         }
 
         if (signal_t1_sent && signal_t2_sent) {
-            cout << "[STRAZNIK] Oba sygnaly wyslane, koncze prace" << endl;
+            cout << COL_RED << "[STRAZNIK]" << COL_RESET << " Oba sygnaly wyslane, koncze prace" << endl;
             break;
         }
     }
