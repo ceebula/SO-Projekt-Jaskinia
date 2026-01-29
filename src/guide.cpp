@@ -105,33 +105,6 @@ static int waiting_count_locked() {
     return stan->q_t2.count + stan->q_t2_prio.count;
 }
 
-__attribute__((unused))
-static void enqueue_return_other_route_locked() {
-    int other = (trasa == 1) ? 2 : 1;
-    GroupItem it{};
-    it.group_size = 1;
-
-    if (other == 1) {
-        if (stan->bilety_sprzedane_t1 + 1 <= N1) {
-            if (q_push(stan->q_t1_prio, it) == 0) {
-                stan->bilety_sprzedane_t1 += 1;
-                stan->oczekujacy_t1 = stan->q_t1.count + stan->q_t1_prio.count;
-                logf_simple("PRZEWODNIK", "Powrot: priorytet na T1");
-                cout << "[PRZEWODNIK T" << trasa << "] POWROT -> priorytet na T1" << endl;
-            }
-        }
-    } else {
-        if (stan->bilety_sprzedane_t2 + 1 <= N2) {
-            if (q_push(stan->q_t2_prio, it) == 0) {
-                stan->bilety_sprzedane_t2 += 1;
-                stan->oczekujacy_t2 = stan->q_t2.count + stan->q_t2_prio.count;
-                logf_simple("PRZEWODNIK", "Powrot: priorytet na T2");
-                cout << "[PRZEWODNIK T" << trasa << "] POWROT -> priorytet na T2" << endl;
-            }
-        }
-    }
-}
-
 int main(int argc, char** argv) {
     if (argc < 2) return 1;
     trasa = atoi(argv[1]);
