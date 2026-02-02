@@ -204,22 +204,34 @@ int main(int argc, char** argv) {
 
         bool zrobiono = false;
 
-        MsgExit msgExit{};
+        //zbieranie wiele MSG_EXIT naraz
         unlock_sem(sem_id);
-
-        if (msgrcv(msg_id, &msgExit, sizeof(msgExit) - sizeof(long), exit_mtype, IPC_NOWAIT) != -1) {
+        
+        int exitTotalPeople = 0;
+        int exitGroupSizes[K];
+        int exitCount = 0;
+        
+        // Odbieramy wiele MSG_EXIT bez blokowania (do limitu K)
+        while (exitCount < K && exitTotalPeople < K) {
+            MsgExit msgExit{};
+            if (msgrcv(msg_id, &msgExit, sizeof(msgExit) - sizeof(long), exit_mtype, IPC_NOWAIT) == -1) break;
             int gsz = (msgExit.group_size > 0) ? msgExit.group_size : 1;
-
+            if (exitTotalPeople + gsz > K) break;
+            exitGroupSizes[exitCount++] = gsz;
+            exitTotalPeople += gsz;
+        }
+        
+        if (exitCount > 0) {
             lock_sem(sem_id);
             int kladka_przed = *kladka;
             int kier_przed = *kierunek;
             
-            if ((*kladka + gsz <= K) &&
+            if ((*kladka + exitTotalPeople <= K) &&
                 (*kierunek == DIR_NONE || *kierunek == DIR_LEAVING)) {
 
                 *kierunek = DIR_LEAVING;
-                *kladka += gsz;
-                (*wjask) -= gsz;
+                *kladka += exitTotalPeople;
+                (*wjask) -= exitTotalPeople;
                 if (*wjask < 0) *wjask = 0;
                 int exit_kladka = *kladka;
                 int exit_kier = *kierunek;
@@ -232,18 +244,15 @@ int main(int argc, char** argv) {
                 lock_sem(sem_id);
                 int kladka_przed2 = *kladka;
                 int kier_przed2 = *kierunek;
-                *kladka -= gsz;
-                (*bilety) -= gsz;
+                *kladka -= exitTotalPeople;
+                (*bilety) -= exitTotalPeople;
                 if (*bilety < 0) *bilety = 0;
                 if (*kladka == 0) *kierunek = DIR_NONE;
                 int exit_kladka_after = *kladka;
                 int exit_kier_after = *kierunek;
 
-                // cout << COL_GREEN << "[PRZEWODNIK T" << trasa << "]" << COL_RESET << " OPUSCIL jaskinie pid=" << msgExit.pid
-                //      << " | bilety=" << *bilety << " | kladka=" << exit_kladka_after << endl;
-
                 char logbuf2[128];
-                snprintf(logbuf2, sizeof(logbuf2), "OPUSCIL jaskinie kladka=%d", exit_kladka_after);
+                snprintf(logbuf2, sizeof(logbuf2), "WYJSCIE %d osob kladka=%d", exitTotalPeople, exit_kladka_after);
                 logf_simple("PRZEWODNIK", logbuf2);
                 unlock_sem(sem_id);
 
