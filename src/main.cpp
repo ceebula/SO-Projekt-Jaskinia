@@ -8,14 +8,8 @@ using namespace std;
 
 int shm_id = -1, sem_id = -1, msg_id = -1;
 
-static int get_sim_hour(time_t start, time_t now, int opening_hour) {
-    int elapsed = (int)(now - start);
-    int hour = opening_hour + (elapsed / SECONDS_PER_HOUR);
-    return hour;
-}
-
 // Handler SIGINT/SIGTERM - sprzątanie zasobów IPC i zakończenie procesów
-static void cleanup(int sig) {
+static void cleanup(int) {
     signal(SIGINT, SIG_IGN);
     signal(SIGTERM, SIG_IGN);
     kill(0, SIGTERM);  // SIGTERM do całej grupy
@@ -108,6 +102,8 @@ int main(int argc, char** argv) {
     int sim_seconds = (closing_hour - opening_hour) * SECONDS_PER_HOUR;
 
     unlink(LOG_FILE);
+    unlink("kladka_t1.log");
+    unlink("kladka_t2.log");
 
     int fd = creat(FTOK_FILE, 0600);
     if (fd == -1) die_perror("creat ftok.key");
@@ -146,7 +142,7 @@ int main(int argc, char** argv) {
     q_init(stan->q_t2);
     q_init(stan->q_t2_prio);
     stan->start_time = time(NULL);
-    stan->end_time = stan->start_time + sim_seconds;
+    stan->end_time = stan->start_time + sim_seconds;  // Guard używa do obliczenia czasu wysłania sygnału
     stan->sim_opening_hour = opening_hour;
     stan->sim_closing_hour = closing_hour;
     stan->active_visitors = 0;
@@ -165,10 +161,9 @@ int main(int argc, char** argv) {
     spawn("./Przewodnik", "Przewodnik", "2");
     spawn("./Straznik", "Straznik");
 
-    time_t sim_start = time(NULL);
-    time_t end_time = sim_start + sim_seconds;
-
-    while (time(NULL) < end_time) {
+    // Main działa w pętli dopóki nie zostanie zakończony przez cleanup (SIGTERM/SIGINT)
+    // Guard kontroluje zakończenie symulacji wysyłając sygnały
+    while (true) {
         usleep((useconds_t)spawn_ms * 1000);
 
         while (waitpid(-1, NULL, WNOHANG) > 0) {
@@ -179,12 +174,7 @@ int main(int argc, char** argv) {
 
         lock_sem(sem_id);
         int current_visitors = stan->active_visitors;
-        int current_hour = get_sim_hour(sim_start, time(NULL), opening_hour);
         unlock_sem(sem_id);
-
-        if (current_hour >= closing_hour) {
-            break;
-        }
 
         if (current_visitors >= MAX_VISITORS) {
             continue;
@@ -196,10 +186,8 @@ int main(int argc, char** argv) {
         unlock_sem(sem_id);
     }
 
-    int final_hour = get_sim_hour(sim_start, time(NULL), opening_hour);
-    cout << COL_CYAN << "[MAIN]" << COL_RESET << " Godzina zamkniecia: " << final_hour << ":00" << endl;
 
-    logf_simple("MAIN", "Koniec spawnowania, czekam na procesy...");
+    logf_simple("MAIN", "Czas symulacji uplynal, czekam na procesy...");
 
     time_t grace_end = time(NULL) + 10;
     while (time(NULL) < grace_end) {

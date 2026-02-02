@@ -169,15 +169,16 @@ int main(int argc, char** argv) {
     else stan->przewodnik_t2_pid = getpid();
     unlock_sem(sem_id);
 
-    cout << COL_GREEN << (trasa == 1 ? "[PRZEWODNIK T1]" : "[PRZEWODNIK T2]") << COL_RESET << " Gotowy" << endl;
+    // cout << COL_GREEN << (trasa == 1 ? "[PRZEWODNIK T1]" : "[PRZEWODNIK T2]") << COL_RESET << " Gotowy" << endl;
 
     long exit_mtype = (trasa == 1) ? MSG_EXIT_T1 : MSG_EXIT_T2;
+    int loop_count = 0;
 
     while (!g_terminated) {
-        time_t now = time(NULL);
+        usleep(200000);
+        loop_count++;
 
         lock_sem(sem_id);
-        bool koniec = (stan->end_time != 0 && now >= stan->end_time);
         bool alarm = alarm_aktywny_locked();
 
         int* wjask = (trasa == 1) ? &stan->osoby_trasa1 : &stan->osoby_trasa2;
@@ -238,8 +239,8 @@ int main(int argc, char** argv) {
                 int exit_kladka_after = *kladka;
                 int exit_kier_after = *kierunek;
 
-                cout << COL_GREEN << "[PRZEWODNIK T" << trasa << "]" << COL_RESET << " OPUSCIL jaskinie pid=" << msgExit.pid
-                     << " | bilety=" << *bilety << " | kladka=" << exit_kladka_after << endl;
+                // cout << COL_GREEN << "[PRZEWODNIK T" << trasa << "]" << COL_RESET << " OPUSCIL jaskinie pid=" << msgExit.pid
+                //      << " | bilety=" << *bilety << " | kladka=" << exit_kladka_after << endl;
 
                 char logbuf2[128];
                 snprintf(logbuf2, sizeof(logbuf2), "OPUSCIL jaskinie kladka=%d", exit_kladka_after);
@@ -255,93 +256,106 @@ int main(int argc, char** argv) {
 
         if (!zrobiono && !alarm) {
             lock_sem(sem_id);
-            GroupItem it{};
-            bool from_prio = false;
-            bool jest = (dequeue_group_locked(it, from_prio) == 0);
-            int group_size = (it.group_size > 0) ? it.group_size : 1;
             int limit_trasy = (trasa == 1) ? N1 : N2;
-
-            if (jest &&
-                (*wjask + group_size <= limit_trasy) &&
-                (*kladka + group_size <= K) &&
-                (*kierunek == DIR_NONE || *kierunek == DIR_ENTERING)) {
-
-                int kladka_przed = *kladka;
-                int kier_przed = *kierunek;
+            int waiting = waiting_count_locked();
+            
+            bool take_now = (waiting >= limit_trasy) || (waiting > 0 && loop_count % 10 == 0);
+            
+            if (take_now && (*kierunek == DIR_NONE || *kierunek == DIR_ENTERING)) {
+                // Zbieramy wiele grup naraz do limitu K (optymalizacja kładki)
+                GroupItem batch[QCAP];
+                int batch_count = 0;
+                int total_people = 0;
                 
-                *kierunek = DIR_ENTERING;
-                *kladka += group_size;
-                int kladka_snap = *kladka;
-                int kier_snap = *kierunek;
-
-                int kolejka_po = waiting_count_locked();
-                unlock_sem(sem_id);
-
-                log_kladka("WCHODZI_NA_KLADKE", kladka_przed, kier_przed, kladka_snap, kier_snap);
-
-                cout << COL_GREEN << "[PRZEWODNIK T" << trasa << "]" << COL_RESET << " WEJSCIE na kladke | kolejka="
-                     << kolejka_po << " | kladka=" << kladka_snap << "/" << K
-                     << " | grupa=" << group_size << " | pid=" << it.pids[0] << endl;
-
-                char logbuf[128];
-                snprintf(logbuf, sizeof(logbuf), "WEJSCIE na kladke kladka=%d", kladka_snap);
-                logf_simple("PRZEWODNIK", logbuf);
-
-                for (int i = 0; i < group_size && i < 2; i++) {
-                    if (it.pids[i] > 0) {
-                        MsgEnter msgEnter{};
-                        msgEnter.mtype = MSG_ENTER_BASE + it.pids[i];
-                        msgEnter.trasa = trasa;
-                        if (msgsnd(msg_id, &msgEnter, sizeof(msgEnter) - sizeof(long), 0) == -1) {
-                            if (errno != EINTR) perror("msgsnd enter");
+                // Pobieramy grupy z kolejki dopóki zmieszczą się na kładce i w jaskini
+                while (batch_count < QCAP) {
+                    GroupItem it{};
+                    bool from_prio = false;
+                    
+                    if (dequeue_group_locked(it, from_prio) != 0) break;
+                    
+                    int group_size = (it.group_size > 0) ? it.group_size : 1;
+                    
+                    // Sprawdź czy ta grupa zmieści się
+                    if (*wjask + total_people + group_size <= limit_trasy &&
+                        *kladka + total_people + group_size <= K) {
+                        batch[batch_count++] = it;
+                        total_people += group_size;
+                    } else {
+                        // Nie zmieści się - wróć do kolejki
+                        if (trasa == 1) {
+                            if (from_prio) q_push(stan->q_t1_prio, it);
+                            else q_push(stan->q_t1, it);
+                        } else {
+                            if (from_prio) q_push(stan->q_t2_prio, it);
+                            else q_push(stan->q_t2, it);
                         }
+                        break;
                     }
                 }
+                
+                if (batch_count > 0) {
+                    int kladka_przed = *kladka;
+                    int kier_przed = *kierunek;
+                    
+                    *kierunek = DIR_ENTERING;
+                    *kladka += total_people;
+                    int kladka_snap = *kladka;
+                    int kier_snap = *kierunek;
 
-                usleep((useconds_t)BRIDGE_DURATION_MS * 1000);
+                    unlock_sem(sem_id);
 
-                lock_sem(sem_id);
-                int kladka_przed2 = *kladka;
-                int kier_przed2 = *kierunek;
-                *kladka -= group_size;
-                (*wjask) += group_size;
-                if (*kladka == 0) *kierunek = DIR_NONE;
-                int kladka_after = *kladka;
-                int kier_after = *kierunek;
-                unlock_sem(sem_id);
+                    log_kladka("WCHODZI_NA_KLADKE", kladka_przed, kier_przed, kladka_snap, kier_snap);
 
-                log_kladka("ZSZEDL_Z_KLADKI", kladka_przed2, kier_przed2, kladka_after, kier_after);
+                    cout << COL_GREEN << "[PRZEWODNIK T" << trasa << "]" << COL_RESET 
+                         << " Wejście " << total_people << " osób (" << batch_count << " grup) | kladka=" 
+                         << kladka_snap << "/" << K << endl;
 
-                cout << COL_GREEN << "[PRZEWODNIK T" << trasa << "]" << COL_RESET << " DOTARL do jaskini | w_jaskini=" << *wjask
-                     << " | kladka=" << kladka_after << endl;
+                    char logbuf[128];
+                    snprintf(logbuf, sizeof(logbuf), "WEJSCIE %d osob (%d grup) kladka=%d", 
+                             total_people, batch_count, kladka_snap);
+                    logf_simple("PRZEWODNIK", logbuf);
 
-                logf_simple("PRZEWODNIK", "DOTARL do jaskini");
-                zrobiono = true;
-            } else if (jest) {
-                if (trasa == 1) {
-                    if (from_prio) q_push(stan->q_t1_prio, it);
-                    else q_push(stan->q_t1, it);
+                    // Wyślij wiadomości MSG_ENTER do wszystkich osób z batcha
+                    for (int b = 0; b < batch_count; b++) {
+                        int group_size = (batch[b].group_size > 0) ? batch[b].group_size : 1;
+                        for (int i = 0; i < group_size && i < 2; i++) {
+                            if (batch[b].pids[i] > 0) {
+                                MsgEnter msgEnter{};
+                                msgEnter.mtype = MSG_ENTER_BASE + batch[b].pids[i];
+                                msgEnter.trasa = trasa;
+                                if (msgsnd(msg_id, &msgEnter, sizeof(msgEnter) - sizeof(long), 0) == -1) {
+                                    if (errno != EINTR) perror("msgsnd enter");
+                                }
+                            }
+                        }
+                    }
+
+                    usleep((useconds_t)BRIDGE_DURATION_MS * 1000);
+
+                    lock_sem(sem_id);
+                    int kladka_przed2 = *kladka;
+                    int kier_przed2 = *kierunek;
+                    *kladka -= total_people;
+                    (*wjask) += total_people;
+                    if (*kladka == 0) *kierunek = DIR_NONE;
+                    int kladka_after = *kladka;
+                    int kier_after = *kierunek;
+                    unlock_sem(sem_id);
+
+                    log_kladka("ZSZEDL_Z_KLADKI", kladka_przed2, kier_przed2, kladka_after, kier_after);
+
+                    logf_simple("PRZEWODNIK", "DOTARL do jaskini");
+                    zrobiono = true;
                 } else {
-                    if (from_prio) q_push(stan->q_t2_prio, it);
-                    else q_push(stan->q_t2, it);
+                    unlock_sem(sem_id);
                 }
-                unlock_sem(sem_id);
             } else {
                 unlock_sem(sem_id);
             }
         }
 
         if (g_terminated) break;
-
-        if (!zrobiono && koniec) {
-            lock_sem(sem_id);
-            bool pusto = (*kladka == 0 &&
-                          (stan->q_t1.count + stan->q_t1_prio.count) == 0 &&
-                          (stan->q_t2.count + stan->q_t2_prio.count) == 0 &&
-                          stan->osoby_trasa1 == 0 && stan->osoby_trasa2 == 0);
-            unlock_sem(sem_id);
-            if (pusto) break;
-        }
 
         usleep(100000);
     }

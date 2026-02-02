@@ -61,9 +61,7 @@ int main() {
 
         lock_sem(sem_id);
 
-        time_t now = time(NULL);
-        if (stan->end_time != 0 && now >= stan->end_time) ok = false;
-
+        // Kasjer odmawia tylko gdy dostanie alarm dla danej trasy
         if (ok) {
             if (msg.typ_biletu == 1) {
                 if (stan->alarm_t1) ok = false;

@@ -34,6 +34,7 @@ int main() {
 
     cout << COL_RED << "[STRAZNIK]" << COL_RESET << " Gotowy, czekam na godzine zamkniecia" << endl;
 
+    // Strażnik wysyła sygnały przed zamknięciem
     while (!g_terminated) {
         usleep(500000);
         if (g_terminated) break;
@@ -52,6 +53,7 @@ int main() {
 
         int hours_before_close = 1;
         bool should_send_signal = (current_hour >= closing - hours_before_close);
+        // bool should_send_signal = 0;
 
         if (should_send_signal && !signal_t1_sent && target_t1 > 0) {
             cout << COL_RED << "[STRAZNIK]" << COL_RESET << " Godzina " << current_hour << ":00 - Wysylam sygnal T1 (zamkniecie o " << closing << ":00)" << endl;
@@ -73,6 +75,35 @@ int main() {
 
         if (signal_t1_sent && signal_t2_sent) {
             cout << COL_RED << "[STRAZNIK]" << COL_RESET << " Oba sygnaly wyslane, koncze prace" << endl;
+            logf_simple("STRAZNIK", "Oczekiwanie na zakonczenie pracy przewodnikow...");
+            
+            // Czekamy aż przewodnicy zakończą obsługę turystów
+            int wait_count = 0;
+            const int max_wait = 60;  // 30 sekund (60 * 500ms)
+            while (wait_count < max_wait) {
+                usleep(500000);
+                lock_sem(sem_id);
+                int w1 = stan->osoby_trasa1;
+                int w2 = stan->osoby_trasa2;
+                int k1 = stan->osoby_na_kladce[0];
+                int k2 = stan->osoby_na_kladce[1];
+                pid_t main_pid = getppid();
+                unlock_sem(sem_id);
+                
+                // Jeśli jaskinia i kładki są puste - możemy kończyć
+                if (w1 == 0 && w2 == 0 && k1 == 0 && k2 == 0) {
+                    cout << COL_RED << "[STRAZNIK]" << COL_RESET << " Jaskinia pusta - wysylam SIGTERM do main" << endl;
+                    logf_simple("STRAZNIK", "Koniec symulacji - SIGTERM do main");
+                    kill(main_pid, SIGTERM);
+                    break;
+                }
+                wait_count++;
+            }
+            
+            if (wait_count >= max_wait) {
+                cout << COL_RED << "[STRAZNIK]" << COL_RESET << " Timeout - wymuszam zakonczenie" << endl;
+                kill(getppid(), SIGTERM);
+            }
             break;
         }
     }

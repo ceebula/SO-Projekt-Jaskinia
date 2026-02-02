@@ -43,7 +43,7 @@ static constexpr int MSG_ID = 'Q';  ///< ID kolejki komunikatów
 
 // === Godziny pracy jaskini ===
 static constexpr int OPENING_HOUR = 8;      ///< Domyślna godzina otwarcia (Tp)
-static constexpr int CLOSING_HOUR = 18;     ///< Domyślna godzina zamknięcia (Tk)
+static constexpr int CLOSING_HOUR = 10;     ///< Domyślna godzina zamknięcia (Tk)
 static constexpr int SECONDS_PER_HOUR = 6;  ///< Sekund rzeczywistych na godzinę symulacji
 
 // === Pojemności tras i kładki ===
