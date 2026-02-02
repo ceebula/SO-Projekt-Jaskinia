@@ -6,6 +6,7 @@
 using namespace std;
 
 static volatile sig_atomic_t g_terminated = 0;
+static volatile sig_atomic_t g_user_shutdown = 0;
 static bool signal_t1_sent = false;
 static bool signal_t2_sent = false;
 
@@ -13,8 +14,12 @@ static void handle_term(int) {
     g_terminated = 1;
 }
 
+static void handle_usr1(int) {
+    g_user_shutdown = 1;
+}
+
 int main() {
-    signal(SIGUSR1, SIG_IGN);
+    signal(SIGUSR1, handle_usr1);
     signal(SIGUSR2, SIG_IGN);
     signal(SIGTERM, handle_term);
 
@@ -52,8 +57,15 @@ int main() {
         int current_hour = opening + (elapsed / SECONDS_PER_HOUR);
 
         int hours_before_close = 1;
-        bool should_send_signal = (current_hour >= closing - hours_before_close);
-        // bool should_send_signal = 0;
+        bool time_to_close = (current_hour >= closing - hours_before_close);
+        bool user_wants_shutdown = (g_user_shutdown != 0);
+        bool should_send_signal = time_to_close || user_wants_shutdown;
+        
+        // Jeśli użytkownik zażądał zakończenia, zaloguj to
+        if (user_wants_shutdown && !signal_t1_sent && !signal_t2_sent) {
+            cout << COL_RED << "[STRAZNIK]" << COL_RESET << " Otrzymano SIGUSR1 - delikatne zamkniecie symulacji" << endl;
+            logf_simple("STRAZNIK", "Uzytkownik zazadal zamkniecia (SIGUSR1)");
+        }
 
         if (should_send_signal && !signal_t1_sent && target_t1 > 0) {
             cout << COL_RED << "[STRAZNIK]" << COL_RESET << " Godzina " << current_hour << ":00 - Wysylam sygnal T1 (zamkniecie o " << closing << ":00)" << endl;

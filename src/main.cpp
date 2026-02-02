@@ -151,10 +151,12 @@ int main(int argc, char** argv) {
     stan->bilety_znizka = 0;
     stan->bilety_total_t1 = 0;
     stan->bilety_total_t2 = 0;
+    stan->user_shutdown_request = 0;
     unlock_sem(sem_id);
 
     cout << COL_CYAN << "[MAIN]" << COL_RESET << " Jaskinia otwarta: " << opening_hour << ":00 - " << closing_hour << ":00" << endl;
     cout << COL_CYAN << "[MAIN]" << COL_RESET << " Czas symulacji: " << sim_seconds << "s (" << SECONDS_PER_HOUR << "s = 1h)" << endl;
+    cout << COL_CYAN << "[MAIN]" << COL_RESET << " Aby zakonczyc \"delikatnie\": pkill -USR1 Straznik (lub Ctrl+C)" << endl;
 
     spawn("./Kasjer", "Kasjer");
     spawn("./Przewodnik", "Przewodnik", "1");
