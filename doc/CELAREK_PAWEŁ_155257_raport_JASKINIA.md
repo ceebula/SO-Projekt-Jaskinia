@@ -218,12 +218,17 @@ Limit K=50 nigdy nie przekroczony. Kierunek zawsze zmieniał się przez NONE.
 
 ### 5.3. Test kolejki komunikatów
 
-**Cel:** Sprawdzenie czy `msgsnd()`/`msgrcv()` działają poprawnie – czy każda wiadomość dociera do odbiorcy.
+**Cel:** Sprawdzenie czy `msgsnd()`/`msgrcv()` działają poprawnie pod obciążeniem.
+
+**Przygotowanie:**
+- Zakomentowane wszystkie `usleep()` w cashier.cpp, visitor.cpp
+- Wyłączone powroty (jak w 5.1)
+- 5000 procesów
 
 **Analiza:**
-- Turysta wysyła `msgsnd(MSG_KASJER)` i czeka na `msgrcv(MSG_ENTER_BASE + pid)`
-- Gdyby wiadomość nie dotarła, proces zawisłby na `msgrcv()` (blokujące)
-- Po teście 5000 procesów nie pozostały żadne procesy zombie ani zawieszone
+- Turysta wysyła żądanie biletu przez `msgsnd()` i czeka na odpowiedź przez `msgrcv()` (blokujące)
+- Kasjer odbiera żądanie, przetwarza i wysyła odpowiedź
+- Gdyby komunikat się zgubił → proces zawisnąłby na `msgrcv()` na zawsze
 
 **Weryfikacja:**
 ```bash
@@ -235,66 +240,83 @@ $ grep -c "Zakończenie trasy" symulacja.log
 ```
 
 **Wynik:** ✅ PASS  
-5000 wejść = 5000 wyjść. Wszystkie komunikaty dotarły.
+5000 wejść = 5000 wyjść. Każdy komunikat dotarł do odbiorcy.
 
 ---
 
 ### 5.4. Test pipe (grupy dziecko+opiekun)
 
-**Cel:** Sprawdzenie czy `pipe()` poprawnie synchronizuje dwa procesy (dziecko i opiekun).
+**Cel:** Sprawdzenie czy `pipe()` poprawnie synchronizuje dwa procesy. Bez pipe opiekun mógłby odebrać komunikat wejścia zanim dziecko kupi bilet.
 
-**Przebieg:**
-1. Uruchomiono symulację z normalnym rozkładem wieku (1-80 lat)
-2. Szukano w logach grup 2-osobowych
+**Mechanizm:**
+1. Dziecko <8 lat tworzy `pipe()` przed `fork()`
+2. Dziecko kupuje bilet i wysyła bajt przez `write(pipe_fd[1], &buf, 1)`
+3. Opiekun blokuje się na `read(pipe_fd[0], &buf, 1)` dopóki dziecko nie wyśle bajtu
+4. Dopiero po `read()` opiekun odbiera `msgrcv(MSG_ENTER_BASE + pid)`
+
+**Przygotowanie - zakomentowane usleep():**
+```cpp
+// visitor.cpp - bez opóźnień, pipe musi synchronizować
+// usleep(...) // zakomentowane
+```
+
+**Test negatywny (gdyby pipe nie działał):**
+- Opiekun wywołałby `msgrcv()` przed dzieckiem → zawisnąłby na zawsze (brak komunikatu)
+- Lub odebrałby cudzy komunikat → błąd synchronizacji
 
 **Weryfikacja:**
 ```bash
-$ grep "grupa=2" symulacja.log | head -3
-[KASJER] Sprzedano bilet pid=12345 wiek=5 trasa=2 grupa=2
-[KASJER] Sprzedano bilet pid=12401 wiek=6 trasa=2 grupa=2
-[KASJER] Sprzedano bilet pid=12567 wiek=4 trasa=2 grupa=2
+$ grep "grupa=2" symulacja.log | wc -l
+127
+
+$ ps aux | awk '$8 ~ /D/' | wc -l   # procesy w stanie "uninterruptible sleep"
+0
 ```
 
-**Oczekiwane zachowanie:**
-- Dziecko tworzy `pipe()` przed `fork()`
-- Po `fork()` dziecko wysyła bajt przez `write(pipe_fd[1], ...)`
-- Opiekun czeka na `read(pipe_fd[0], ...)` zanim odbierze komunikat wejścia
-- Obie osoby wchodzą razem (licznik kładki += 2)
-
 **Wynik:** ✅ PASS  
-Grupy wchodzą i wychodzą razem. Brak rozspójnienia (np. dziecko na trasie bez opiekuna).
+127 grup 2-osobowych obsłużonych bez zawieszenia. Pipe poprawnie synchronizuje dziecko i opiekuna.
 
 ---
 
-### 5.5. Test sygnałów
+### 5.5. Test sygnałów (graceful shutdown)
 
-**Cel:** Sprawdzenie czy sygnały SIGUSR1/SIGUSR2 działają i czy zasoby IPC są zwalniane po zakończeniu.
+**Cel:** Sprawdzenie łańcucha sygnałów: użytkownik → strażnik (SIGUSR1) → przewodnicy (SIGUSR1/SIGUSR2) → main (SIGTERM).
 
 **Przebieg:**
 1. Uruchomiono symulację
 2. Wysłano: `pkill -USR1 Straznik`
-3. Sprawdzono stan po zakończeniu
 
 **Fragment logów:**
 ```
-[STRAZNIK] Otrzymano SIGUSR1 - inicjuję zamknięcie
-[STRAZNIK] Wysłano sygnał zamknięcia do przewodnika T1
-[STRAZNIK] Wysłano sygnał zamknięcia do przewodnika T2
-[PRZEWODNIK T1] Anulowanie grupy pid=...
-[STRAZNIK] Jaskinia pusta, wysyłam SIGTERM do main
+[STRAZNIK] Otrzymano SIGUSR1 - delikatne zamkniecie symulacji
+[STRAZNIK] Godzina 9:00 - Wysylam sygnal T1 (zamkniecie o 18:00)
+[STRAZNIK] Godzina 9:00 - Wysylam sygnal T2 (zamkniecie o 18:00)
+[PRZEWODNIK T1] Alarm! Blokada nowych wejsc do zamkniecia
+[PRZEWODNIK T2] Alarm! Blokada nowych wejsc do zamkniecia
+[STRAZNIK] Oba sygnaly wyslane, koncze prace
+[PRZEWODNIK T1] Alarm przed wyjsciem - anulowano 1 osob
+[PRZEWODNIK T2] Alarm przed wyjsciem - anulowano 3 osob
+[STRAZNIK] Jaskinia pusta - wysylam SIGTERM do main
 ```
+
+**Łańcuch sygnałów:**
+- `pkill -USR1 Straznik` → handler `handle_usr1()` ustawia flagę `g_user_shutdown`
+- Strażnik: `kill(przewodnik_t1, SIGUSR1)` i `kill(przewodnik_t2, SIGUSR2)`
+- Przewodnicy: handler `alarm_t1()`/`alarm_t2()` ustawia flagę w pamięci dzielonej
+- Strażnik czeka aż jaskinia pusta, potem: `kill(getppid(), SIGTERM)`
+- Main: handler `cleanup()` sprząta zasoby IPC
 
 **Weryfikacja po zakończeniu:**
 ```bash
-$ ps aux | grep -E "(Jaskini|Przewodnik|Kasjer)" | grep -v grep | wc -l
+$ pgrep -f "Jaskini|Przewodnik|Kasjer|Straznik|Zwiedzajacy" | wc -l
 0
 
-$ ipcs -s && ipcs -m && ipcs -q
-# brak zasobów związanych z symulacją
+$ ipcs
+# brak zasobów IPC
 ```
 
 **Wynik:** ✅ PASS  
-Sygnał SIGUSR1 inicjuje zamknięcie. Wszystkie procesy kończą się, zasoby IPC są zwalniane.
+5 sygnałów (SIGUSR1 × 2, SIGUSR2, SIGTERM × 2) poprawnie obsłużonych. Graceful shutdown działa.
 
 ---
 

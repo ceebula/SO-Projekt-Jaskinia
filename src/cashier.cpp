@@ -43,6 +43,11 @@ int main() {
 
         bool ok = true;
 
+        // === WALIDACJA REGULAMINU ===
+        // - dzieci <3: bezpłatnie
+        // - dzieci <8: tylko T2, z opiekunem (grupa=2)
+        // - seniorzy 76+: tylko T2
+        // - pozostali: dowolna trasa
         if (msg.wiek < 1 || msg.wiek > 80) ok = false;
         if (msg.typ_biletu != 1 && msg.typ_biletu != 2) ok = false;
 
@@ -51,11 +56,11 @@ int main() {
 
         if (ok) {
             if (msg.wiek < 8) {
-                if (msg.typ_biletu != 2) ok = false;
-                if (gsz != 2) ok = false;
+                if (msg.typ_biletu != 2) ok = false;  // tylko T2
+                if (gsz != 2) ok = false;             // musi mieć opiekuna
             } else {
                 if (gsz != 1) ok = false;
-                if (msg.wiek > 75 && msg.typ_biletu != 2) ok = false;
+                if (msg.wiek > 75 && msg.typ_biletu != 2) ok = false;  // senior tylko T2
             }
         }
 

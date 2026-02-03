@@ -41,6 +41,10 @@ int main(int argc, char** argv) {
 
     // cout << COL_BLUE << "[TURYSTA " << getpid() << "]" << COL_RESET << " Wiek=" << wiek << endl;
 
+    // === SYNCHRONIZACJA DZIECKO+OPIEKUN ===
+    // Dziecko <8 lat musi mieć opiekuna (regulamin). Tworzymy pipe przed fork(),
+    // dziecko sygnalizuje opiekunowi przez write() po kupieniu biletu,
+    // opiekun czeka na read() zanim odbierze komunikat wejścia.
     if (wiek < 8) {
         trasa = 2;
         group_size = 2;

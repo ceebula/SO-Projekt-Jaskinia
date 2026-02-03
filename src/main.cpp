@@ -8,18 +8,23 @@ using namespace std;
 
 int shm_id = -1, sem_id = -1, msg_id = -1;
 
-// Handler SIGINT/SIGTERM - sprzątanie zasobów IPC i zakończenie procesów
+// === CLEANUP - sprzątanie zasobów IPC ===
+// Wywoływane przy SIGINT (Ctrl+C) lub SIGTERM (od strażnika)
+// Kolejność: 1) ignoruj kolejne sygnały 2) SIGTERM do potomków
+//            3) waitpid() na zombie 4) usuń IPC (shm, sem, msg)
 static void cleanup(int) {
     signal(SIGINT, SIG_IGN);
     signal(SIGTERM, SIG_IGN);
-    kill(0, SIGTERM);  // SIGTERM do całej grupy
+    kill(0, SIGTERM);  // SIGTERM do całej grupy procesów
 
+    // Zbieranie procesów zombie
     for (int i = 0; i < 50; i++) {
         int rc = waitpid(-1, NULL, WNOHANG);
         if (rc == -1 && errno == ECHILD) break;
         usleep(100000);
     }
 
+    // Usuwanie zasobów IPC - ważne przy Ctrl+C żeby nie zaśmiecać systemu
     if (shm_id != -1 && shmctl(shm_id, IPC_RMID, NULL) == -1) perror("shmctl");
     if (sem_id != -1 && semctl(sem_id, 0, IPC_RMID) == -1) perror("semctl");
     if (msg_id != -1 && msgctl(msg_id, IPC_RMID, NULL) == -1) perror("msgctl");

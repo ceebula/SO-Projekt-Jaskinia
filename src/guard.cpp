@@ -57,6 +57,10 @@ int main() {
         int current_hour = opening + (elapsed / SECONDS_PER_HOUR);
 
         int hours_before_close = 1;
+        // === ŁAŃCUCH SYGNAŁÓW ZAMKNIĘCIA ===
+        // Zamknięcie inicjowane przez: czas (godzina Tk-1) LUB użytkownika (pkill -USR1)
+        // Strażnik → SIGUSR1 do przewodnika T1, SIGUSR2 do T2
+        // Po opróżnieniu jaskini → SIGTERM do main → cleanup()
         bool time_to_close = (current_hour >= closing - hours_before_close);
         bool user_wants_shutdown = (g_user_shutdown != 0);
         bool should_send_signal = time_to_close || user_wants_shutdown;

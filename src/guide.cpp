@@ -174,6 +174,11 @@ int main(int argc, char** argv) {
     long exit_mtype = (trasa == 1) ? MSG_EXIT_T1 : MSG_EXIT_T2;
     int loop_count = 0;
 
+    // === GŁÓWNA PĘTLA PRZEWODNIKA ===
+    // Algorytm: 1) Odbierz MSG_EXIT (wychodzący) 2) Przepuść przez kładkę
+    //           3) Pobierz grupy z kolejki 4) Przepuść wchodzących
+    // Kładka ma 3 stany kierunku: NONE, ENTERING, LEAVING
+    // Zmiana kierunku możliwa tylko gdy kładka pusta (NONE)
     while (!g_terminated) {
         usleep(200000);
         loop_count++;
@@ -271,7 +276,8 @@ int main(int argc, char** argv) {
             bool take_now = (waiting >= limit_trasy) || (waiting > 0 && loop_count % 10 == 0);
             
             if (take_now && (*kierunek == DIR_NONE || *kierunek == DIR_ENTERING)) {
-                // Zbieramy wiele grup naraz do limitu K (optymalizacja kładki)
+                // Optymalizacja: zbieranie wielu grup w jeden batch
+                // Przepuszczenie N osób naraz zamiast pojedynczo zmniejsza czas oczekiwania
                 GroupItem batch[QCAP];
                 int batch_count = 0;
                 int total_people = 0;
