@@ -24,6 +24,42 @@ static void cleanup(int) {
         usleep(100000);
     }
 
+    // === PODSUMOWANIE przed usunięciem zasobów IPC ===
+    if (shm_id != -1) {
+        JaskiniaStan* stan = (JaskiniaStan*)shmat(shm_id, NULL, SHM_RDONLY);
+        if (stan != (void*)-1) {
+            key_t key = ftok(FTOK_FILE, SEM_ID);
+            int sem = semget(key, 1, 0600);
+            
+            int total_t1 = 0, total_t2 = 0, przychod = 0, darmowe = 0, znizka = 0;
+            if (sem != -1) {
+                lock_sem(sem);
+                total_t1 = stan->bilety_total_t1;
+                total_t2 = stan->bilety_total_t2;
+                przychod = stan->przychod;
+                darmowe = stan->bilety_darmowe;
+                znizka = stan->bilety_znizka;
+                unlock_sem(sem);
+            }
+            shmdt(stan);
+
+            cout << "\n========== PODSUMOWANIE ==========" << endl;
+            cout << "Bilety T1:        " << total_t1 << endl;
+            cout << "Bilety T2:        " << total_t2 << endl;
+            cout << "Razem biletow:    " << (total_t1 + total_t2) << endl;
+            cout << "  - darmowych:    " << darmowe << " (dzieci <3 lat)" << endl;
+            cout << "  - ze znizka:    " << znizka << " (powrot -50%)" << endl;
+            cout << "PRZYCHOD:         " << przychod << " zl" << endl;
+            cout << "==================================\n" << endl;
+
+            char summary[256];
+            snprintf(summary, sizeof(summary), "Bilety: %d, Przychod: %d zl", total_t1 + total_t2, przychod);
+            logf_simple("MAIN", summary);
+        }
+    }
+
+    logf_simple("MAIN", "STOP");
+
     // Usuwanie zasobów IPC - ważne przy Ctrl+C żeby nie zaśmiecać systemu
     if (shm_id != -1 && shmctl(shm_id, IPC_RMID, NULL) == -1) perror("shmctl");
     if (sem_id != -1 && semctl(sem_id, 0, IPC_RMID) == -1) perror("semctl");
@@ -170,6 +206,7 @@ int main(int argc, char** argv) {
 
     // Main działa w pętli dopóki nie zostanie zakończony przez cleanup (SIGTERM/SIGINT)
     // Guard kontroluje zakończenie symulacji wysyłając sygnały
+    // Podsumowanie jest wypisywane w cleanup()
     while (true) {
         usleep((useconds_t)spawn_ms * 1000);
 
@@ -193,38 +230,5 @@ int main(int argc, char** argv) {
         unlock_sem(sem_id);
     }
 
-
-    logf_simple("MAIN", "Czas symulacji uplynal, czekam na procesy...");
-
-    time_t grace_end = time(NULL) + 10;
-    while (time(NULL) < grace_end) {
-        int rc = waitpid(-1, NULL, WNOHANG);
-        if (rc == -1 && errno == ECHILD) break;
-        usleep(100000);
-    }
-
-    lock_sem(sem_id);
-    int total_t1 = stan->bilety_total_t1;
-    int total_t2 = stan->bilety_total_t2;
-    int przychod = stan->przychod;
-    int darmowe = stan->bilety_darmowe;
-    int znizka = stan->bilety_znizka;
-    unlock_sem(sem_id);
-
-    cout << "\n========== PODSUMOWANIE ==========" << endl;
-    cout << "Bilety T1:        " << total_t1 << endl;
-    cout << "Bilety T2:        " << total_t2 << endl;
-    cout << "Razem biletow:    " << (total_t1 + total_t2) << endl;
-    cout << "  - darmowych:    " << darmowe << " (dzieci <3 lat)" << endl;
-    cout << "  - ze znizka:    " << znizka << " (powrot -50%)" << endl;
-    cout << "PRZYCHOD:         " << przychod << " zl" << endl;
-    cout << "==================================\n" << endl;
-
-    char summary[256];
-    snprintf(summary, sizeof(summary), "Bilety: %d, Przychod: %d zl", total_t1 + total_t2, przychod);
-    logf_simple("MAIN", summary);
-
-    logf_simple("MAIN", "STOP");
-    cleanup(0);
     return 0;
 }
