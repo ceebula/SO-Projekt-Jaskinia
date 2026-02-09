@@ -63,11 +63,15 @@ int main() {
         // Po opróżnieniu jaskini → SIGTERM do main → cleanup()
         bool time_to_close = (current_hour >= closing - hours_before_close);
         bool user_wants_shutdown = (g_user_shutdown != 0);
+
+        // bool should_send_signal = 0;
         bool should_send_signal = time_to_close || user_wants_shutdown;
+        
+
         
         // Jeśli użytkownik zażądał zakończenia, zaloguj to
         if (user_wants_shutdown && !signal_t1_sent && !signal_t2_sent) {
-            cout << COL_RED << "[STRAZNIK]" << COL_RESET << " Otrzymano SIGUSR1 - delikatne zamkniecie symulacji" << endl;
+            cout << COL_RED << "[STRAZNIK]" << COL_RESET << " Otrzymano SIGUSR1" << endl;
             logf_simple("STRAZNIK", "Uzytkownik zazadal zamkniecia (SIGUSR1)");
         }
 

@@ -137,6 +137,7 @@ static void log_kladka(const char* action, int kladka_przed, int kier_przed,
 }
 
 int main(int argc, char** argv) {
+    // sleep(10);
     if (argc < 2) return 1;
     trasa = atoi(argv[1]);
     if (trasa != 1 && trasa != 2) return 1;
@@ -179,6 +180,7 @@ int main(int argc, char** argv) {
     //           3) Pobierz grupy z kolejki 4) Przepuść wchodzących
     // Kładka ma 3 stany kierunku: NONE, ENTERING, LEAVING
     // Zmiana kierunku możliwa tylko gdy kładka pusta (NONE)
+    
     while (!g_terminated) {
         usleep(200000);
         loop_count++;
@@ -322,9 +324,9 @@ int main(int argc, char** argv) {
 
                     log_kladka("WCHODZI_NA_KLADKE", kladka_przed, kier_przed, kladka_snap, kier_snap);
 
-                    cout << COL_GREEN << "[PRZEWODNIK T" << trasa << "]" << COL_RESET 
-                         << " Wejście " << total_people << " osób (" << batch_count << " grup) | kladka=" 
-                         << kladka_snap << "/" << K << endl;
+                    // cout << COL_GREEN << "[PRZEWODNIK T" << trasa << "]" << COL_RESET 
+                    //      << " Wejście " << total_people << " osób (" << batch_count << " grup) | kladka=" 
+                    //      << kladka_snap << "/" << K << endl;
 
                     char logbuf[128];
                     snprintf(logbuf, sizeof(logbuf), "WEJSCIE %d osob (%d grup) kladka=%d", 

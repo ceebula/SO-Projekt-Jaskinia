@@ -50,6 +50,9 @@ static constexpr int SECONDS_PER_HOUR = 6;  ///< Sekund rzeczywistych na godzin�
 static constexpr int N1 = 10;  ///< Max osób na trasie T1
 static constexpr int N2 = 10;  ///< Max osób na trasie T2
 static constexpr int K  = 3;   ///< Max osób na kładce jednocześnie
+// static constexpr int N1 = 500;  
+// static constexpr int N2 = 500;
+// static constexpr int K  = 50; 
 
 // === Czasy zwiedzania ===
 static constexpr int T1_MS = 2000;           ///< Czas zwiedzania trasy T1 [ms]
@@ -58,10 +61,10 @@ static constexpr int BRIDGE_DURATION_MS = 300;  ///< Czas przejścia przez kład
 
 // === Parametry symulacji ===
 static constexpr int SPAWN_MS_DEFAULT = 1000;  ///< Domyślny interwał spawnu turystów [ms]
-static constexpr int MAX_VISITORS = 50;        ///< Max aktywnych procesów turystów
+static constexpr int MAX_VISITORS = 50000;        ///< Max aktywnych procesów turystów
 static constexpr int TICKET_PRICE = 20;        ///< Cena biletu w zł
 
-static constexpr int QCAP = 128;  ///< Pojemność kolejki grup
+static constexpr int QCAP = 12800;  ///< Pojemność kolejki grup
 
 // === Typy komunikatów w kolejce ===
 static constexpr long MSG_KASJER = 1;       ///< Komunikat do kasjera (zakup biletu)
