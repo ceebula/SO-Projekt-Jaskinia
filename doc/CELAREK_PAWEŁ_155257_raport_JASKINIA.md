@@ -391,3 +391,22 @@ Projekt zrealizowany . Zastosowano:
 **Testy:**
 - Przeprowadzono test obciążeniowy z 5000 procesami bez opóźnień - wszystkie mechanizmy IPC działały poprawnie
 - Zweryfikowano synchronizację kładek, kolejkę komunikatów, pipe i sygnały
+
+---
+
+## Kompilacja i uruchomienie (CMake)
+
+Projekt korzysta z CMake (`CMakeLists.txt` w katalogu głównym). Budowanie odbywa się w katalogu `build/`.
+
+### Kompilacja
+```bash
+mkdir -p build
+cmake -S . -B build
+cmake --build build
+```
+
+### Uruchomienie
+```bash
+cd build
+./SymulacjaJaskini
+```
