@@ -294,64 +294,69 @@ grep -c "OPIEKUN" symulacja.log
 
 ## 6. Linki do kodu źródłowego
 
-*linki zostaną dodane na koniec, dla ukończonego projektu*
+Poniższe linki wskazują na konkretne linie kodu w repozytorium.
 
-### 6.a. Tworzenie i obsługa plików
-| Funkcja | Plik |
-|---------|------|
-| `creat()` | main.cpp |
-| `open()` | common.hpp |
-| `write()` | common.hpp |
-| `close()` | common.hpp |
-| `unlink()` | main.cpp |
+### 6.a. Tworzenie i obsługa plików (`creat()`, `open()`, `close()`, `read()`, `write()`, `unlink()`)
+| Funkcja | Link do fragmentu |
+|---|---|
+| `unlink()` / `creat()` / `close()` | [src/main.cpp L166-L173](https://github.com/ceebula/SO-Projekt-Jaskinia/blob/eb7ee990175da5d51b56ea697ac448ccc21d6ae8/src/main.cpp#L166-L173) |
+| `open()` / `write()` / `close()` (log) | [include/common.hpp L80-L87](https://github.com/ceebula/SO-Projekt-Jaskinia/blob/eb7ee990175da5d51b56ea697ac448ccc21d6ae8/include/common.hpp#L80-L87) |
+| `read()` (synchronizacja dziecko+opiekun) | [src/visitor.cpp L95-L106](https://github.com/ceebula/SO-Projekt-Jaskinia/blob/eb7ee990175da5d51b56ea697ac448ccc21d6ae8/src/visitor.cpp#L95-L106) |
+| `write()` (synchronizacja dziecko+opiekun) | [src/visitor.cpp L168-L173](https://github.com/ceebula/SO-Projekt-Jaskinia/blob/eb7ee990175da5d51b56ea697ac448ccc21d6ae8/src/visitor.cpp#L168-L173) |
 
-### 6.b. Tworzenie procesów
-| Funkcja | Plik |
-|---------|------|
-| `fork()` | main.cpp, visitor.cpp |
-| `execl()` | main.cpp |
-| `exit()` | main.cpp |
-| `_exit()` | main.cpp |
-| `waitpid()` | main.cpp |
+### 6.b. Tworzenie procesów (`fork()`, `exec*()`, `exit()`, `wait()`)
+| Funkcja | Link do fragmentu |
+|---|---|
+| `fork()` + `execl()` (spawn procesu) | [src/main.cpp L24-L35](https://github.com/ceebula/SO-Projekt-Jaskinia/blob/eb7ee990175da5d51b56ea697ac448ccc21d6ae8/src/main.cpp#L24-L35) |
+| `fork()` + `execl()` (opiekun dziecka) | [src/visitor.cpp L52-L70](https://github.com/ceebula/SO-Projekt-Jaskinia/blob/eb7ee990175da5d51b56ea697ac448ccc21d6ae8/src/visitor.cpp#L52-L70) |
+| `_exit()` (błąd po `exec`) | [src/main.cpp L29-L33](https://github.com/ceebula/SO-Projekt-Jaskinia/blob/eb7ee990175da5d51b56ea697ac448ccc21d6ae8/src/main.cpp#L29-L33) |
+| `waitpid()` (sprzątanie potomków przy shutdown) | [src/main.cpp L46-L76](https://github.com/ceebula/SO-Projekt-Jaskinia/blob/eb7ee990175da5d51b56ea697ac448ccc21d6ae8/src/main.cpp#L46-L76) |
+| `wait()` (test masowy `TEST_5000`) | [src/main.cpp L264-L271](https://github.com/ceebula/SO-Projekt-Jaskinia/blob/eb7ee990175da5d51b56ea697ac448ccc21d6ae8/src/main.cpp#L264-L271) |
 
-### 6.c. Obsługa sygnałów
-| Funkcja | Plik |
-|---------|------|
-| `signal()` | main.cpp, guide.cpp, guard.cpp |
-| `kill()` | main.cpp, guard.cpp |
+### 6.c. Tworzenie i obsługa wątków (`pthread_*`)
+W projekcie **nie użyto wątków POSIX** (symulacja jest oparta o procesy `fork()`/`exec()`).
 
-### 6.d. Synchronizacja procesów (semafory)
-| Funkcja | Plik |
-|---------|------|
-| `ftok()` | main.cpp |
-| `semget()` | main.cpp |
-| `semctl()` | main.cpp |
-| `semop()` | common.hpp |
+### 6.d. Obsługa sygnałów (`kill()`, `raise()`, `signal()`, `sigaction()`)
+| Funkcja | Link do fragmentu |
+|---|---|
+| `signal()` (instalacja handlerów) | [src/guard.cpp L21-L25](https://github.com/ceebula/SO-Projekt-Jaskinia/blob/eb7ee990175da5d51b56ea697ac448ccc21d6ae8/src/guard.cpp#L21-L25) |
+| `kill()` (wysyłka `SIGUSR1/SIGUSR2` do przewodników) | [src/guard.cpp L81-L96](https://github.com/ceebula/SO-Projekt-Jaskinia/blob/eb7ee990175da5d51b56ea697ac448ccc21d6ae8/src/guard.cpp#L81-L96) |
+| `signal()` + `kill()` + `SIGKILL` (zamykanie i dobijanie potomków) | [src/main.cpp L46-L73](https://github.com/ceebula/SO-Projekt-Jaskinia/blob/eb7ee990175da5d51b56ea697ac448ccc21d6ae8/src/main.cpp#L46-L73) |
 
-### 6.e. Pamięć dzielona
-| Funkcja | Plik |
-|---------|------|
-| `shmget()` | main.cpp |
-| `shmat()` | main.cpp, cashier.cpp, guide.cpp |
-| `shmdt()` | cashier.cpp, guide.cpp |
-| `shmctl()` | main.cpp |
+### 6.e. Synchronizacja procesów (semafory System V: `ftok()`, `semget()`, `semctl()`, `semop()`)
+| Funkcja | Link do fragmentu |
+|---|---|
+| `ftok()` + `semget()` + `semctl(SETVAL)` | [src/main.cpp L176-L195](https://github.com/ceebula/SO-Projekt-Jaskinia/blob/eb7ee990175da5d51b56ea697ac448ccc21d6ae8/src/main.cpp#L176-L195) |
+| `semop()` (blokada/odblokowanie) | [include/common.hpp L217-L251](https://github.com/ceebula/SO-Projekt-Jaskinia/blob/eb7ee990175da5d51b56ea697ac448ccc21d6ae8/include/common.hpp#L217-L251) |
+| `semctl(IPC_RMID)` (usuwanie semafora) | [src/main.cpp L111-L116](https://github.com/ceebula/SO-Projekt-Jaskinia/blob/eb7ee990175da5d51b56ea697ac448ccc21d6ae8/src/main.cpp#L111-L116) |
 
-### 6.f. Kolejki komunikatów
-| Funkcja | Plik |
-|---------|------|
-| `msgget()` | main.cpp |
-| `msgsnd()` | visitor.cpp, cashier.cpp, guide.cpp |
-| `msgrcv()` | cashier.cpp, visitor.cpp, guide.cpp |
-| `msgctl()` | main.cpp |
+### 6.f. Łącza nazwane i nienazwane (`mkfifo()`, `pipe()`, `dup()`, `dup2()`, `popen()`)
+| Mechanizm | Link do fragmentu |
+|---|---|
+| `pipe()` + `read()` + `write()` | [src/visitor.cpp L48-L58](https://github.com/ceebula/SO-Projekt-Jaskinia/blob/eb7ee990175da5d51b56ea697ac448ccc21d6ae8/src/visitor.cpp#L48-L58) oraz [src/visitor.cpp L95-L106](https://github.com/ceebula/SO-Projekt-Jaskinia/blob/eb7ee990175da5d51b56ea697ac448ccc21d6ae8/src/visitor.cpp#L95-L106) / [src/visitor.cpp L168-L173](https://github.com/ceebula/SO-Projekt-Jaskinia/blob/eb7ee990175da5d51b56ea697ac448ccc21d6ae8/src/visitor.cpp#L168-L173) |
 
-### 6.g. Łącza nienazwane (pipe)
-| Funkcja | Plik |
-|---------|------|
-| `pipe()` | visitor.cpp |
-| `read()` | visitor.cpp |
-| `write()` | visitor.cpp |
+W projekcie **nie użyto**: `mkfifo()`, `dup()`, `dup2()`, `popen()`.
 
----
+### 6.g. Segmenty pamięci dzielonej (System V: `ftok()`, `shmget()`, `shmat()`, `shmdt()`, `shmctl()`)
+| Funkcja | Link do fragmentu |
+|---|---|
+| `ftok()` + `shmget()` + `shmctl(IPC_RMID)` | [src/main.cpp L176-L184](https://github.com/ceebula/SO-Projekt-Jaskinia/blob/eb7ee990175da5d51b56ea697ac448ccc21d6ae8/src/main.cpp#L176-L184) |
+| `shmat()` | [src/main.cpp L197-L199](https://github.com/ceebula/SO-Projekt-Jaskinia/blob/eb7ee990175da5d51b56ea697ac448ccc21d6ae8/src/main.cpp#L197-L199) |
+| `shmdt()` | [src/main.cpp L77-L79](https://github.com/ceebula/SO-Projekt-Jaskinia/blob/eb7ee990175da5d51b56ea697ac448ccc21d6ae8/src/main.cpp#L77-L79) |
+| `shmctl(IPC_RMID)` (usuwanie SHM) | [src/main.cpp L111-L116](https://github.com/ceebula/SO-Projekt-Jaskinia/blob/eb7ee990175da5d51b56ea697ac448ccc21d6ae8/src/main.cpp#L111-L116) |
+
+### 6.h. Kolejki komunikatów (System V: `ftok()`, `msgget()`, `msgsnd()`, `msgrcv()`, `msgctl()`)
+| Funkcja | Link do fragmentu |
+|---|---|
+| `ftok()` + `msgget()` | [src/main.cpp L193-L196](https://github.com/ceebula/SO-Projekt-Jaskinia/blob/eb7ee990175da5d51b56ea697ac448ccc21d6ae8/src/main.cpp#L193-L196) |
+| `msgrcv()` (kasjer odbiera) | [src/cashier.cpp L30-L42](https://github.com/ceebula/SO-Projekt-Jaskinia/blob/eb7ee990175da5d51b56ea697ac448ccc21d6ae8/src/cashier.cpp#L30-L42) |
+| `msgsnd()` (kasjer odsyła odpowiedź) | [src/cashier.cpp L150-L157](https://github.com/ceebula/SO-Projekt-Jaskinia/blob/eb7ee990175da5d51b56ea697ac448ccc21d6ae8/src/cashier.cpp#L150-L157) |
+| `msgrcv()` (turysta czeka na pozwolenie wejścia) | [src/visitor.cpp L175-L183](https://github.com/ceebula/SO-Projekt-Jaskinia/blob/eb7ee990175da5d51b56ea697ac448ccc21d6ae8/src/visitor.cpp#L175-L183) |
+| `msgctl(IPC_RMID)` (usuwanie kolejki) | [src/main.cpp L111-L112](https://github.com/ceebula/SO-Projekt-Jaskinia/blob/eb7ee990175da5d51b56ea697ac448ccc21d6ae8/src/main.cpp#L111-L112) |
+
+### 6.i. Gniazda (`socket()`, `bind()`, `listen()`, `accept()`, `connect()`)
+W projekcie **nie użyto gniazd** (komunikacja jest realizowana przez kolejkę komunikatów + pamięć dzieloną + semafory + `pipe()`).
+
 
 ## 7. Podsumowanie
 
