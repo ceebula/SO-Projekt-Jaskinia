@@ -64,8 +64,11 @@ int main() {
         bool time_to_close = (current_hour >= closing - hours_before_close);
         bool user_wants_shutdown = (g_user_shutdown != 0);
 
-        // bool should_send_signal = 0;
+        #ifndef TEST_5000
         bool should_send_signal = time_to_close || user_wants_shutdown;
+        #else
+        bool should_send_signal = 0;
+        #endif
         
 
         

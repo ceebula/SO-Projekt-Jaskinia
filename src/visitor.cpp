@@ -20,9 +20,11 @@ int main(int argc, char** argv) {
     signal(SIGINT, handle_term);
 
     srand((unsigned)time(NULL) ^ (unsigned)getpid());
-
-    // int wiek = 8 + (rand() % 72);
+    #ifdef TEST_5000
+    int wiek = 8 + (rand() % 72);
+    #else
     int wiek = 1 + (rand() % 80);
+    #endif
     int trasa = (rand() % 2) + 1;
     int group_size = 1;
     pid_t pids[2] = {getpid(), 0};
@@ -119,7 +121,9 @@ static void run_visitor(int wiek, int trasa, int group_size, pid_t pids[2], int 
         }
 
         cout << COL_MAGENTA << "[OPIEKUN " << mypid << "]" << COL_RESET << " Wchodzę na trasę T2" << endl;
+        #ifndef TEST_5000
         usleep((useconds_t)T2_MS * 1000);
+        #endif
         cout << COL_MAGENTA << "[OPIEKUN " << mypid << "]" << COL_RESET << " Skończyłem trasę T2" << endl;
 
         MsgExit msgExit{};
@@ -188,7 +192,9 @@ static void run_visitor(int wiek, int trasa, int group_size, pid_t pids[2], int 
     logf_simple("TURYSTA", "Wejście na trasę");
 
     int czas_ms = (trasa == 1) ? T1_MS : T2_MS;
+    #ifndef TEST_5000
     usleep((useconds_t)czas_ms * 1000);
+    #endif
 
     cout << COL_BLUE << "[TURYSTA " << mypid << "]" << COL_RESET << " Skończyłem trasę T" << trasa << ", wychodzę" << endl;
     logf_simple("TURYSTA", "Zakończenie trasy");
@@ -197,8 +203,9 @@ static void run_visitor(int wiek, int trasa, int group_size, pid_t pids[2], int 
     msgExit.mtype = (trasa == 1) ? MSG_EXIT_T1 : MSG_EXIT_T2;
     msgExit.pid = mypid;
     msgExit.group_size = 1;
-
-    // sleep(5);
+    #ifdef TEST_5000
+    sleep(5);
+    #endif
     if (msgsnd(msg_id, &msgExit, sizeof(msgExit) - sizeof(long), 0) == -1) {
         if (errno != EINTR && errno != EIDRM) {
             perror("msgsnd exit");
@@ -206,8 +213,11 @@ static void run_visitor(int wiek, int trasa, int group_size, pid_t pids[2], int 
     }
 
     // Umożliwia powroty (10% szans)
-    // if (group_size == -1 && (rand() % 10) == 0) {
+    #ifdef TEST_5000
+    if (group_size == -1 && (rand() % 10) == 0) {
+    #else
     if (group_size == 1 && (rand() % 10) == 0) {
+    #endif
         int nowa_trasa = (trasa == 1) ? 2 : 1;
         if (wiek > 75 && nowa_trasa == 1) return;
 
@@ -251,7 +261,9 @@ static void run_visitor(int wiek, int trasa, int group_size, pid_t pids[2], int 
         logf_simple("TURYSTA", "Powrot: wejście na trasę");
 
         int czas2 = (nowa_trasa == 1) ? T1_MS : T2_MS;
+        #ifndef TEST_5000
         usleep((useconds_t)czas2 * 1000);
+        #endif
 
         cout << COL_BLUE << "[TURYSTA " << mypid << "]" << COL_RESET << " Skończyłem trasę T" << nowa_trasa << " (powrot)" << endl;
         logf_simple("TURYSTA", "Powrot: zakończenie trasy");

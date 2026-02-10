@@ -27,6 +27,8 @@
 #define COL_MAGENTA "\033[35m"
 #define COL_CYAN    "\033[36m"
 
+// #define TEST_5000
+
 static inline void die_perror(const char* ctx) {
     perror(ctx);
     exit(EXIT_FAILURE);
@@ -47,12 +49,15 @@ static constexpr int CLOSING_HOUR = 18;     ///< Domyślna godzina zamknięcia (
 static constexpr int SECONDS_PER_HOUR = 6;  ///< Sekund rzeczywistych na godzinę symulacji
 
 // === Pojemności tras i kładki ===
+#ifndef TEST_5000
 static constexpr int N1 = 10;  ///< Max osób na trasie T1
 static constexpr int N2 = 10;  ///< Max osób na trasie T2
 static constexpr int K  = 3;   ///< Max osób na kładce jednocześnie
-// static constexpr int N1 = 500;  
-// static constexpr int N2 = 500;
-// static constexpr int K  = 50; 
+#else
+static constexpr int N1 = 500;  
+static constexpr int N2 = 500;
+static constexpr int K  = 50;
+#endif
 
 // === Czasy zwiedzania ===
 static constexpr int T1_MS = 2000;           ///< Czas zwiedzania trasy T1 [ms]

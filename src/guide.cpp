@@ -137,7 +137,9 @@ static void log_kladka(const char* action, int kladka_przed, int kier_przed,
 }
 
 int main(int argc, char** argv) {
-    // sleep(10);
+    #ifdef TEST_5000
+    sleep(10);
+    #endif
     if (argc < 2) return 1;
     trasa = atoi(argv[1]);
     if (trasa != 1 && trasa != 2) return 1;
@@ -182,7 +184,10 @@ int main(int argc, char** argv) {
     // Zmiana kierunku możliwa tylko gdy kładka pusta (NONE)
     
     while (!g_terminated) {
+        #ifndef TEST_5000
         usleep(200000);
+        #endif
+
         loop_count++;
 
         lock_sem(sem_id);
@@ -204,7 +209,9 @@ int main(int argc, char** argv) {
                 unlock_sem(sem_id);
                 cout << COL_GREEN << "[PRZEWODNIK T" << trasa << "] Alarm przed wyjsciem - anulowano " << anul << " osob" << endl;
                 logf_simple("PRZEWODNIK", "Alarm: anulowanie kolejki");
+                #ifndef TEST_5000
                 usleep(100000);
+                #endif
                 continue;
             }
         }
@@ -245,8 +252,9 @@ int main(int argc, char** argv) {
                 unlock_sem(sem_id);
 
                 log_kladka("WCHODZI_NA_KLADKE", kladka_przed, kier_przed, exit_kladka, exit_kier);
-
+                #ifndef TEST_5000
                 usleep((useconds_t)BRIDGE_DURATION_MS * 1000);
+                #endif
 
                 lock_sem(sem_id);
                 int kladka_przed2 = *kladka;
@@ -347,9 +355,9 @@ int main(int argc, char** argv) {
                             }
                         }
                     }
-
+                    #ifndef TEST_5000
                     usleep((useconds_t)BRIDGE_DURATION_MS * 1000);
-
+                    #endif
                     lock_sem(sem_id);
                     int kladka_przed2 = *kladka;
                     int kier_przed2 = *kierunek;
@@ -373,8 +381,9 @@ int main(int argc, char** argv) {
         }
 
         if (g_terminated) break;
-
+        #ifndef TEST_5000
         usleep(100000);
+        #endif
     }
 
     lock_sem(sem_id);

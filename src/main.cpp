@@ -225,9 +225,18 @@ int main(int argc, char** argv) {
     g_guide1 = spawn("./Przewodnik", "Przewodnik", "1");
     g_guide2 = spawn("./Przewodnik", "Przewodnik", "2");
     g_guard = spawn("./Straznik", "Straznik");
+    #ifdef TEST_5000
+    int i = 0;
+    #endif
 
-    while (!g_shutdown) {
+    while (!g_shutdown
+    #ifdef TEST_5000
+        && i < 5000
+    #endif
+    ) {
+        #ifndef TEST_5000
         usleep((useconds_t)spawn_ms * 1000);
+        #endif
         if (g_shutdown) break;
         while (waitpid(-1, NULL, WNOHANG) > 0) {
             lock_sem(sem_id);
@@ -247,7 +256,20 @@ int main(int argc, char** argv) {
         lock_sem(sem_id);
         stan->active_visitors++;
         unlock_sem(sem_id);
+        #ifdef TEST_5000
+        i++;
+        #endif
     }
+
+    #ifdef TEST_5000
+    int st;
+    while (true) {
+        pid_t w = wait(&st);
+        if (w > 0) continue;
+        if (w == -1 && errno == EINTR) continue;
+        break;
+    }
+    #endif
 
     cleanup(0);
     return 0;
